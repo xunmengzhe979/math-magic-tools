@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>带分数变形计 - 安安老师教研站</title>
+    <style>
+        :root {
+            --primary: #FF9800;       /* 橙色-披萨色 */
+            --primary-light: #FFF3E0;
+            --secondary: #03A9F4;      /* 蓝色-逻辑色 */
+            --bg-color: #F8F9FA;
+            --panel-bg: #FFFFFF;
+            --text-main: #333333;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+            font-family: 'PingFang SC', 'Microsoft YaHei', sans-serif;
+            background-color: var(--bg-color);
+            display: flex;
+            height: 100vh;
+            overflow: hidden;
+            color: var(--text-main);
+        }
+
+        /* 左侧控制区 1/3 */
+        #control-panel {
+            width: 30%;
+            min-width: 320px;
+            background-color: var(--panel-bg);
+            margin: 20px;
+            border-radius: 16px;
+            box-shadow: 0 8px 24px rgba(0,0,0,0.06);
+            display: flex;
+            flex-direction: column;
+            padding: 30px;
+            z-index: 10;
+        }
+
+        .header { text-align: center; margin-bottom: 25px; padding-bottom: 15px; border-bottom: 2px dashed #eee; }
+        .header h1 { font-size: 22px; color: var(--primary); letter-spacing: 1px; font-weight: bold; }
+
+        .control-group { margin-bottom: 20px; display: flex; flex-direction: column; gap: 10px; }
+        .control-label { font-size: 15px; font-weight: bold; color: var(--text-main); }
+
+        .input-item {
+            display: flex; align-items: center; justify-content: space-between;
+            background: #F9FAFB; padding: 12px; border-radius: 10px; border: 1px solid #E5E7EB;
+        }
+        .input-item span { font-weight: bold; font-size: 14px; color: #666; }
+        
+        .counter-box { display: flex; align-items: center; gap: 15px; }
+        .counter-btn {
+            width: 30px; height: 30px; border-radius: 50%; border: none;
+            background: var(--primary); color: white; font-weight: bold; cursor: pointer;
+            display: flex; align-items: center; justify-content: center; transition: 0.2s;
+        }
+        .counter-btn:hover { transform: scale(1.1); background: #F57C00; }
+        .counter-btn:disabled { background: #CCC; cursor: not-allowed; }
+        .counter-val { font-size: 18px; font-weight: bold; width: 20px; text-align: center; }
+
+        .btn-transform {
+            margin-top: 20px; padding: 16px; font-size: 18px; font-weight: bold;
+            border: none; border-radius: 12px; cursor: pointer; transition: all 0.3s;
+            background-color: var(--secondary); color: white;
+            box-shadow: 0 4px 12px rgba(3, 169, 244, 0.3);
+        }
+        .btn-transform:hover { transform: translateY(-2px); background-color: #0288D1; }
+        .btn-transform.active { background-color: var(--primary); box-shadow: 0 4px 12px rgba(255, 152, 0, 0.3); }
+
+        .formula-card {
+            margin-top: auto; background: var(--primary-light); border-radius: 12px;
+            padding: 20px; text-align: center; border: 2px solid var(--primary);
+        }
+        .formula-text { font-size: 24px; font-family: 'Times New Roman', serif; font-weight: bold; color: #E65100; }
+
+        /* 右侧展示区 2/3 */
+        #display-area {
+            flex: 1; background-color: #FFFFFF; margin: 20px 20px 20px 0;
+            border-radius: 16px; box-shadow: 0 8px 24px rgba(0,0,0,0.04);
+            position: relative; display: flex; flex-direction: column;
+            justify-content: center; align-items: center; overflow: hidden;
+        }
+
+        #pizza-container {
+            display: flex; flex-wrap: wrap; justify-content: center; gap: 40px;
+            width: 90%; max-width: 800px; transition: all 0.5s;
+        }
+
+        /* 披萨样式 */
+        .pizza { width: 160px; height: 160px; position: relative; }
+        .slice {
+            position: absolute; width: 100%; height: 100%;
+            clip-path: polygon(50% 50%, 50% 0%, 100% 0%, 100% 100%, 0% 100%, 0% 0%); /* 占位符逻辑 */
+            transition: transform 0.6s cubic-bezier(0.34, 1.56, 0.64, 1);
+        }
+
+        .watermark {
+            position: absolute; right: 30px; bottom: 30px;
+            font-size: 32px; font-weight: bold; color: rgba(0, 0, 0, 0.05);
+            letter-spacing: 4px; pointer-events: none; user-select: none;
+        }
+
+        .hint-text {
+            position: absolute; top: 40px; font-size: 20px; font-weight: bold;
+            color: var(--secondary); background: rgba(3, 169, 244, 0.1);
+            padding: 10px 30px; border-radius: 30px;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="control-panel">
+        <div class="header">
+            <h1>带分数变形计</h1>
+        </div>
+
+        <div class="control-group">
+            <div class="control-label">设置分数：</div>
+            
+            <div class="input-item">
+                <span>整数部分 (个)</span>
+                <div class="counter-box">
+                    <button class="counter-btn" onclick="updateVal('whole', -1)">-</button>
+                    <div class="counter-val" id="val-whole">2</div>
+                    <button class="counter-btn" onclick="updateVal('whole', 1)">+</button>
+                </div>
+            </div>
+
+            <div class="input-item">
+                <span>分母 (切成几份)</span>
+                <div class="counter-box">
+                    <button class="counter-btn" onclick="updateVal('den', -1)">-</button>
+                    <div class="counter-val" id="val-den">4</div>
+                    <button class="counter-btn" onclick="updateVal('den', 1)">+</button>
+                </div>
+            </div>
+
+            <div class="input-item">
+                <span>分子 (剩几小片)</span>
+                <div class="counter-box">
+                    <button class="counter-btn" onclick="updateVal('num', -1)">-</button>
+                    <div class="counter-val" id="val-num">1</div>
+                    <button class="counter-btn" onclick="updateVal('num', 1)">+</button>
+                </div>
+            </div>
+        </div>
+
+        <button class="btn-transform" id="transBtn" onclick="toggleTransform()">一键切分变形</button>
+
+        <div class="formula-card">
+            <div id="formula" class="formula-text">2 <sup>1</sup>/<sub>4</sub></div>
+        </div>
+    </div>
+
+    <div id="display-area">
+        <div class="hint-text" id="statusHint">当前展示：带分数状态</div>
+        <div id="pizza-container"></div>
+        <div class="watermark">安安老师</div>
+    </div>
+
+    <script>
+        let state = {
+            whole: 2,
+            den: 4,
+            num: 1,
+            isTransformed: false
+        };
+
+        const pizzaContainer = document.getElementById('pizza-container');
+        const formulaDiv = document.getElementById('formula');
+        const statusHint = document.getElementById('statusHint');
+        const transBtn = document.getElementById('transBtn');
+
+        function updateVal(type, delta) {
+            if (state.isTransformed) toggleTransform(); // 修改数据时自动重置
+
+            if (type === 'whole') state.whole = Math.max(1, Math.min(4, state.whole + delta));
+            if (type === 'den') {
+                state.den = Math.max(2, Math.min(8, state.den + delta));
+                if (state.num >= state.den) state.num = state.den - 1;
+            }
+            if (type === 'num') state.num = Math.max(1, Math.min(state.den - 1, state.num + delta));
+
+            render();
+        }
+
+        function toggleTransform() {
+            state.isTransformed = !state.isTransformed;
+            transBtn.innerText = state.isTransformed ? "还原带分数" : "一键切分变形";
+            transBtn.classList.toggle('active', state.isTransformed);
+            statusHint.innerText = state.isTransformed ? "魔法切分：假分数状态" : "当前展示：带分数状态";
+            render();
+        }
+
+        function render() {
+            // 更新控制台数值
+            document.getElementById('val-whole').innerText = state.whole;
+            document.getElementById('val-den').innerText = state.den;
+            document.getElementById('val-num').innerText = state.num;
+
+            // 更新公式
+            if (!state.isTransformed) {
+                formulaDiv.innerHTML = `${state.whole} <span style="font-size:0.8em; vertical-align:super;">${state.num}</span>/<span style="font-size:0.8em; vertical-align:sub;">${state.den}</span>`;
+            } else {
+                const total = state.whole * state.den + state.num;
+                formulaDiv.innerHTML = `<span style="font-size:0.8em; vertical-align:super;">${state.whole}×${state.den}+${state.num}</span>/<span style="font-size:0.8em; vertical-align:sub;">${state.den}</span> = <span style="font-size:1.1em; color:#D84315;">${total}/${state.den}</span>`;
+            }
+
+            // 更新图形
+            pizzaContainer.innerHTML = '';
+            
+            // 绘制完整披萨
+            for (let i = 0; i < state.whole; i++) {
+                pizzaContainer.appendChild(createPizzaSVG(state.den, state.den, state.isTransformed));
+            }
+            // 绘制分数部分披萨
+            pizzaContainer.appendChild(createPizzaSVG(state.num, state.den, true)); // 分数部分永远是“切开”的
+        }
+
+        function createPizzaSVG(slices, totalSlices, exploded) {
+            const svgNS = "http://www.w3.org/2000/svg";
+            const svg = document.createElementNS(svgNS, "svg");
+            svg.setAttribute("viewBox", "0 0 100 100");
+            svg.setAttribute("class", "pizza");
+
+            const colors = ['#FFB74D', '#FFA726', '#FF9800', '#FB8C00'];
+
+            for (let i = 0; i < slices; i++) {
+                const path = document.createElementNS(svgNS, "path");
+                const angle = 360 / totalSlices;
+                const startAngle = i * angle;
+                const endAngle = (i + 1) * angle;
+
+                // 计算扇形路径
+                const x1 = 50 + 45 * Math.cos(Math.PI * (startAngle - 90) / 180);
+                const y1 = 50 + 45 * Math.sin(Math.PI * (startAngle - 90) / 180);
+                const x2 = 50 + 45 * Math.cos(Math.PI * (endAngle - 90) / 180);
+                const y2 = 50 + 45 * Math.sin(Math.PI * (endAngle - 90) / 180);
+
+                const d = `M 50 50 L ${x1} ${y1} A 45 45 0 0 1 ${x2} ${y2} Z`;
+                path.setAttribute("d", d);
+                path.setAttribute("fill", colors[i % colors.length]);
+                path.setAttribute("stroke", "#FFF");
+                path.setAttribute("stroke-width", exploded ? "1" : "0.5");
+
+                // 爆炸/分离动画
+                if (exploded) {
+                    const midAngle = startAngle + angle / 2;
+                    const moveX = 5 * Math.cos(Math.PI * (midAngle - 90) / 180);
+                    const moveY = 5 * Math.sin(Math.PI * (midAngle - 90) / 180);
+                    path.style.transform = `translate(${moveX}px, ${moveY}px)`;
+                }
+                
+                path.style.transition = "all 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275)";
+                svg.appendChild(path);
+            }
+
+            // 如果没切分，画一个外圈圆显示完整感
+            if (!exploded) {
+                const circle = document.createElementNS(svgNS, "circle");
+                circle.setAttribute("cx", "50");
+                circle.setAttribute("cy", "50");
+                circle.setAttribute("r", "45");
+                circle.setAttribute("fill", "none");
+                circle.setAttribute("stroke", "rgba(0,0,0,0.05)");
+                circle.setAttribute("stroke-width", "1");
+                svg.appendChild(circle);
+            }
+
+            return svg;
+        }
+
+        window.onload = render;
+    </script>
+</body>
+</html>

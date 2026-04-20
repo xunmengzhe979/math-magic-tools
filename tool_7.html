@@ -1,0 +1,364 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>体积与容积注水实验 - 安安老师教研站</title>
+    <style>
+        :root {
+            --primary: #4FC3F7;       /* 水的马卡龙蓝 */
+            --primary-dark: #0288D1;
+            --action: #66BB6A;        /* 按钮绿 */
+            --bg-color: #F8F9FA;
+            --panel-bg: #FFFFFF;
+            --text-main: #333333;
+            --border-color: #E0E0E0;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+            font-family: 'PingFang SC', 'Microsoft YaHei', sans-serif;
+            background-color: var(--bg-color);
+            display: flex;
+            height: 100vh;
+            overflow: hidden;
+            color: var(--text-main);
+        }
+
+        /* 左侧控制区 1/3 */
+        #control-panel {
+            width: 32%;
+            min-width: 340px;
+            background-color: var(--panel-bg);
+            margin: 20px;
+            border-radius: 16px;
+            box-shadow: 0 8px 24px rgba(0,0,0,0.06);
+            display: flex;
+            flex-direction: column;
+            padding: 25px;
+            z-index: 10;
+        }
+
+        .header { text-align: center; margin-bottom: 20px; padding-bottom: 15px; border-bottom: 2px dashed #eee; }
+        .header h1 { font-size: 22px; color: var(--primary-dark); letter-spacing: 1px; font-weight: bold; }
+
+        /* 滑块控制区 */
+        .sliders-container { margin-bottom: 20px; }
+        .slider-group { margin-bottom: 18px; background: #F9FAFB; padding: 12px 15px; border-radius: 10px; border: 1px solid #E5E7EB; }
+        .slider-header { display: flex; justify-content: space-between; margin-bottom: 8px; font-size: 15px; font-weight: bold; color: #555; }
+        .slider-val { color: var(--primary-dark); font-size: 16px; font-weight: bold; }
+        
+        input[type=range] {
+            width: 100%; height: 6px; background: #E0E0E0; border-radius: 3px; outline: none; -webkit-appearance: none; cursor: pointer;
+        }
+        input[type=range]::-webkit-slider-thumb {
+            -webkit-appearance: none; width: 22px; height: 22px; border-radius: 50%;
+            background: var(--primary-dark); box-shadow: 0 2px 5px rgba(0,0,0,0.2); transition: 0.1s;
+        }
+        input[type=range]::-webkit-slider-thumb:active { transform: scale(1.15); }
+
+        /* 操作按钮 */
+        .btn-group { display: flex; gap: 15px; margin-bottom: 20px; }
+        .btn {
+            flex: 1; padding: 14px 0; font-size: 16px; font-weight: bold; border: none; border-radius: 10px; cursor: pointer; transition: all 0.2s;
+        }
+        .btn-fill { background-color: var(--primary); color: white; box-shadow: 0 4px 12px rgba(79, 195, 247, 0.4); }
+        .btn-fill:hover { background-color: var(--primary-dark); transform: translateY(-2px); }
+        .btn-fill:active { transform: translateY(0); }
+        .btn-empty { background-color: #FFEBEE; color: #D32F2F; }
+        .btn-empty:hover { background-color: #FFCDD2; }
+
+        /* 算理展示卡片 */
+        .formula-card {
+            margin-top: auto; background: #E1F5FE; border-radius: 12px; padding: 15px 20px;
+            border: 2px solid var(--primary-dark); display: flex; flex-direction: column; gap: 10px;
+        }
+        .f-row { display: flex; justify-content: space-between; font-size: 15px; font-weight: bold; color: #455A64; }
+        .f-val { color: var(--primary-dark); font-family: 'Times New Roman', serif; font-size: 18px; }
+        .f-highlight { color: #E65100; font-size: 20px; }
+        
+        .divider { width: 100%; height: 1px; background: #B3E5FC; margin: 5px 0; }
+
+        /* 右侧展示区 2/3 */
+        #display-area {
+            flex: 1; background-color: #FFFFFF; margin: 20px 20px 20px 0; border-radius: 16px; box-shadow: 0 8px 24px rgba(0,0,0,0.04); position: relative; overflow: hidden;
+        }
+        
+        .hint-text { position: absolute; top: 20px; left: 20px; font-size: 14px; font-weight: bold; color: #90A4AE; background: rgba(255,255,255,0.8); padding: 5px 10px; border-radius: 8px; z-index: 5; pointer-events: none;}
+
+        #canvas-container { width: 100%; height: 100%; position: absolute; top: 0; left: 0; z-index: 1; }
+        
+        /* 3D 尺寸标注标签 */
+        .label-3d {
+            position: absolute; font-size: 16px; font-weight: bold; color: #333;
+            background: rgba(255, 255, 255, 0.85); padding: 2px 8px; border-radius: 6px;
+            border: 1px solid #CCC; transform: translate(-50%, -50%);
+            pointer-events: none; transition: opacity 0.2s; z-index: 2;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1); white-space: nowrap; opacity: 0; /* 初始隐藏 */
+        }
+
+        .watermark {
+            position: absolute; right: 25px; bottom: 20px; font-size: 32px; font-weight: bold; color: rgba(0, 0, 0, 0.04); letter-spacing: 2px; pointer-events: none; user-select: none; z-index: 3;
+        }
+
+        .error-msg {
+            position: absolute; top: 40%; left: 50%; transform: translate(-50%, -50%);
+            font-size: 20px; color: #D32F2F; font-weight: bold; text-align: center;
+        }
+    </style>
+    
+    <script src="https://unpkg.com/three@0.128.0/build/three.min.js"></script>
+    <script src="https://unpkg.com/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+</head>
+<body>
+
+    <div id="control-panel">
+        <div class="header">
+            <h1>体积与容积探究</h1>
+        </div>
+
+        <div class="sliders-container">
+            <div class="slider-group">
+                <div class="slider-header"><span>水箱长 (a)</span><span class="slider-val" id="val-l">5 dm</span></div>
+                <input type="range" id="slider-l" min="2" max="10" value="5" oninput="updateParam('l', this.value)">
+            </div>
+            <div class="slider-group">
+                <div class="slider-header"><span>水箱宽 (b)</span><span class="slider-val" id="val-w">4 dm</span></div>
+                <input type="range" id="slider-w" min="2" max="10" value="4" oninput="updateParam('w', this.value)">
+            </div>
+            <div class="slider-group">
+                <div class="slider-header"><span>水箱高 (h)</span><span class="slider-val" id="val-h">6 dm</span></div>
+                <input type="range" id="slider-h" min="2" max="10" value="6" oninput="updateParam('h', this.value)">
+            </div>
+        </div>
+
+        <div class="btn-group">
+            <button class="btn btn-fill" onclick="startFill()">▶ 开始注水</button>
+            <button class="btn btn-empty" onclick="emptyTank()">↻ 清空水箱</button>
+        </div>
+
+        <div class="formula-card">
+            <div class="f-row">
+                <span>底面积 (S = a × b)</span>
+                <span class="f-val" id="f-area">5 × 4 = 20 dm²</span>
+            </div>
+            <div class="f-row">
+                <span>体积 (V = S × h)</span>
+                <span class="f-val f-highlight" id="f-vol">20 × 6 = 120 dm³</span>
+            </div>
+            <div class="divider"></div>
+            <div style="text-align: center; font-size: 13px; color: #78909C; margin-bottom: 5px;">换算：1 dm³ = 1 升(L)</div>
+            <div class="f-row" style="justify-content: center; font-size: 16px;">
+                <span class="f-val f-highlight" id="f-cap">120 L = 120,000 mL</span>
+            </div>
+        </div>
+    </div>
+
+    <div id="display-area">
+        <div class="hint-text">🖱️ 提示：按住鼠标左键可旋转 3D 水箱，滚轮可缩放</div>
+        
+        <div id="canvas-container"></div>
+        
+        <div id="lbl-len" class="label-3d">长=5</div>
+        <div id="lbl-wid" class="label-3d">宽=4</div>
+        <div id="lbl-hei" class="label-3d">高=6</div>
+
+        <div class="watermark">安安老师</div>
+    </div>
+
+    <script>
+        // --- 核心数据 ---
+        let params = { l: 5, w: 4, h: 6 };
+        let waterRatio = 0;       // 当前水位比例 0~1
+        let targetWaterRatio = 0; // 目标水位比例 0~1
+
+        // --- Three.js 核心对象 ---
+        let scene, camera, renderer, controls;
+        let tankGroup, tankEdges, waterMesh;
+
+        // DOM 元素
+        const container = document.getElementById('canvas-container');
+        const lblLen = document.getElementById('lbl-len');
+        const lblWid = document.getElementById('lbl-wid');
+        const lblHei = document.getElementById('lbl-hei');
+
+        function init3D() {
+            // 1. 场景与相机
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color(0xFFFFFF);
+
+            camera = new THREE.PerspectiveCamera(45, container.clientWidth / container.clientHeight, 0.1, 1000);
+            camera.position.set(12, 10, 15);
+
+            // 2. 渲染器
+            renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+            renderer.setSize(container.clientWidth, container.clientHeight);
+            renderer.setPixelRatio(window.devicePixelRatio);
+            container.appendChild(renderer.domElement);
+
+            // 3. 控制器
+            controls = new THREE.OrbitControls(camera, renderer.domElement);
+            controls.enableDamping = true;
+            controls.target.set(0, 3, 0); // 看向水箱中心
+
+            // 4. 灯光
+            scene.add(new THREE.AmbientLight(0xffffff, 0.6));
+            const dirLight = new THREE.DirectionalLight(0xffffff, 0.5);
+            dirLight.position.set(10, 20, 10);
+            scene.add(dirLight);
+
+            // 5. 底部辅助网格
+            const gridHelper = new THREE.GridHelper(30, 30, 0xcccccc, 0xeeeeee);
+            scene.add(gridHelper);
+
+            // 6. 创建水箱 (透明玻璃感)
+            tankGroup = new THREE.Group();
+            scene.add(tankGroup);
+
+            // 水箱轮廓线 (清晰展示长方体框架)
+            const boxGeo = new THREE.BoxGeometry(1, 1, 1);
+            const edgeGeo = new THREE.EdgesGeometry(boxGeo);
+            tankEdges = new THREE.LineSegments(edgeGeo, new THREE.LineBasicMaterial({ color: 0x90A4AE, linewidth: 2 }));
+            tankGroup.add(tankEdges);
+
+            // 水箱半透明玻璃面
+            const glassMat = new THREE.MeshPhongMaterial({ 
+                color: 0xE1F5FE, transparent: true, opacity: 0.15, side: THREE.DoubleSide, shininess: 100
+            });
+            const glassMesh = new THREE.Mesh(boxGeo, glassMat);
+            tankGroup.add(glassMesh);
+
+            // 7. 创建水体
+            const waterMat = new THREE.MeshPhongMaterial({ 
+                color: 0x29B6F6, transparent: true, opacity: 0.85, shininess: 80 
+            });
+            waterMesh = new THREE.Mesh(boxGeo, waterMat);
+            scene.add(waterMesh);
+
+            // 监听窗口缩放
+            window.addEventListener('resize', onWindowResize);
+
+            // 更新模型与算式
+            updateShapes();
+            animate();
+        }
+
+        // 滑块交互
+        function updateParam(key, value) {
+            params[key] = parseFloat(value);
+            document.getElementById(`val-${key}`).innerText = `${value} dm`;
+            updateShapes();
+        }
+
+        // 注水/清空 交互
+        function startFill() { targetWaterRatio = 1; }
+        function emptyTank() { targetWaterRatio = 0; }
+
+        // 核心更新逻辑：同步3D模型与数学公式
+        function updateShapes() {
+            const { l, w, h } = params;
+
+            // 1. 更新算式面板
+            const area = l * w;
+            const vol = area * h;
+            document.getElementById('f-area').innerText = `${l} × ${w} = ${area} dm²`;
+            document.getElementById('f-vol').innerText = `${area} × ${h} = ${vol} dm³`;
+            document.getElementById('f-cap').innerText = `${vol} L = ${(vol * 1000).toLocaleString()} mL`;
+
+            // 确保3D环境加载成功后再操作
+            if(!tankGroup) return; 
+
+            // 2. 更新水箱形状 (注意 3D 坐标系中 y 是高度，z 是深度也就是宽)
+            tankGroup.scale.set(l, h, w);
+            tankGroup.position.y = h / 2; // 让底部贴紧地面 (y=0)
+
+            // 3. 更新标签文字
+            lblLen.innerText = `长=${l}`;
+            lblWid.innerText = `宽=${w}`;
+            lblHei.innerText = `高=${h}`;
+        }
+
+        // 将 3D 坐标投影到 2D 屏幕坐标 (用于 HTML 标签跟随)
+        function updateLabelsPosition() {
+            const { l, w, h } = params;
+            
+            // 定义三个测绘点
+            // 长：前方底边中心
+            const ptLen = new THREE.Vector3(0, 0, w/2);
+            // 宽：右方底边中心
+            const ptWid = new THREE.Vector3(l/2, 0, 0);
+            // 高：右前竖边中心
+            const ptHei = new THREE.Vector3(l/2, h/2, w/2);
+
+            function setLabel(labelEl, pos3D, offset) {
+                const vec = pos3D.clone();
+                vec.project(camera);
+                const x = (vec.x * .5 + .5) * container.clientWidth;
+                const y = (vec.y * -.5 + .5) * container.clientHeight;
+                
+                // 如果在相机背后，则隐藏
+                if (vec.z > 1) {
+                    labelEl.style.opacity = 0;
+                } else {
+                    labelEl.style.opacity = 1;
+                    labelEl.style.left = `${x + offset.x}px`;
+                    labelEl.style.top = `${y + offset.y}px`;
+                }
+            }
+
+            // 标签稍作偏移以免挡住线条
+            setLabel(lblLen, ptLen, {x: 0, y: 20});
+            setLabel(lblWid, ptWid, {x: 20, y: 15});
+            setLabel(lblHei, ptHei, {x: 25, y: 0});
+        }
+
+        // 动画循环
+        function animate() {
+            requestAnimationFrame(animate);
+
+            // 平滑计算水位 (缓动函数)
+            waterRatio += (targetWaterRatio - waterRatio) * 0.05;
+
+            const { l, w, h } = params;
+            const currentWaterH = Math.max(0.01, h * waterRatio); // 防止 scale 为 0 导致矩阵警告
+
+            // 只有当水位 > 1% 时才显示水
+            waterMesh.visible = waterRatio > 0.01;
+
+            // 更新水体模型 (略微缩小一点点防止与水箱边框闪烁 Z-fighting)
+            waterMesh.scale.set(l - 0.04, currentWaterH, w - 0.04);
+            waterMesh.position.y = currentWaterH / 2; // 水从底面往上长
+
+            controls.update();
+            updateLabelsPosition(); // 每帧更新标签位置
+            renderer.render(scene, camera);
+        }
+
+        // 窗口缩放适配
+        function onWindowResize() {
+            camera.aspect = container.clientWidth / container.clientHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(container.clientWidth, container.clientHeight);
+        }
+
+        // --- 安全启动逻辑 ---
+        window.onload = () => {
+            // 检查 3D 引擎是否成功被下载和解析
+            if (typeof THREE === 'undefined') {
+                container.innerHTML = `
+                    <div class="error-msg">
+                        <svg viewBox="0 0 24 24" width="60" height="60" fill="#D32F2F" style="margin-bottom:15px;">
+                            <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/>
+                        </svg><br>
+                        抱歉，3D 图形引擎加载失败！<br>
+                        <span style="font-size:14px; color:#666; font-weight:normal;">可能是由于当前网络拦截了相关的开源库。请尝试刷新页面，或更换网络环境。</span>
+                    </div>
+                `;
+                return; // 如果加载失败，终止后续步骤，避免白屏死机
+            }
+            init3D();
+        };
+    </script>
+</body>
+</html>

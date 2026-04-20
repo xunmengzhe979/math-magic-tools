@@ -1,0 +1,404 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>排水法求不规则物体体积 - 安安老师教研站</title>
+    <style>
+        :root {
+            --primary: #4FC3F7;       /* 水的颜色 */
+            --primary-dark: #0288D1;
+            --highlight: #FF9800;     /* 高亮排水层颜色 */
+            --bg-color: #F8F9FA;
+            --panel-bg: #FFFFFF;
+            --text-main: #333333;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+            font-family: 'PingFang SC', 'Microsoft YaHei', sans-serif;
+            background-color: var(--bg-color);
+            display: flex;
+            height: 100vh;
+            overflow: hidden;
+            color: var(--text-main);
+            user-select: none;
+        }
+
+        /* 左侧控制区 1/3 */
+        #control-panel {
+            width: 32%;
+            min-width: 350px;
+            background-color: var(--panel-bg);
+            margin: 20px;
+            border-radius: 16px;
+            box-shadow: 0 8px 24px rgba(0,0,0,0.06);
+            display: flex;
+            flex-direction: column;
+            padding: 25px;
+            z-index: 10;
+        }
+
+        .header { text-align: center; margin-bottom: 20px; padding-bottom: 15px; border-bottom: 2px dashed #eee; }
+        .header h1 { font-size: 22px; color: var(--primary-dark); letter-spacing: 1px; font-weight: bold; }
+
+        /* 参数设置区 */
+        .sliders-container { margin-bottom: 15px; }
+        .slider-group { background: #F9FAFB; padding: 10px 15px; border-radius: 10px; border: 1px solid #E5E7EB; margin-bottom: 10px; }
+        .slider-header { display: flex; justify-content: space-between; margin-bottom: 8px; font-size: 14px; font-weight: bold; color: #555; }
+        .slider-val { color: var(--primary-dark); font-size: 15px; }
+        
+        input[type=range] { width: 100%; height: 6px; background: #E0E0E0; border-radius: 3px; outline: none; -webkit-appearance: none; cursor: pointer; }
+        input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 20px; height: 20px; border-radius: 50%; background: var(--primary-dark); box-shadow: 0 2px 5px rgba(0,0,0,0.2); transition: 0.1s; }
+        input[type=range]::-webkit-slider-thumb:active { transform: scale(1.15); }
+
+        /* 按钮区 */
+        .btn-group { display: flex; gap: 12px; margin-bottom: 20px; }
+        .btn { flex: 1; padding: 12px 0; font-size: 16px; font-weight: bold; border: none; border-radius: 10px; cursor: pointer; transition: all 0.2s; display: flex; align-items: center; justify-content: center; }
+        .btn-play { background-color: var(--primary); color: white; box-shadow: 0 4px 12px rgba(79, 195, 247, 0.4); }
+        .btn-play:hover { background-color: var(--primary-dark); transform: translateY(-2px); }
+        .btn-play:active { transform: translateY(0); }
+        .btn-reset { background-color: #FFF3E0; color: #E65100; border: 1px solid #FFE0B2; }
+        .btn-reset:hover { background-color: #FFE0B2; }
+
+        /* 动态算理展示卡片 */
+        .formula-card {
+            margin-top: auto; background: #E1F5FE; border-radius: 12px; padding: 15px;
+            border: 2px solid var(--primary-dark); display: flex; flex-direction: column; gap: 12px;
+            transition: all 0.3s;
+        }
+        .f-step { font-size: 14px; font-weight: bold; color: #455A64; background: rgba(255,255,255,0.6); padding: 8px 10px; border-radius: 6px; }
+        .f-val { color: var(--primary-dark); font-family: 'Times New Roman', serif; font-size: 16px; margin-top: 4px; display: block; }
+        .f-highlight { color: #E65100; font-size: 18px; }
+        .f-hidden { opacity: 0.3; filter: blur(2px); } /* 未执行到的步骤变模糊 */
+
+        /* 右侧展示区 2/3 */
+        #display-area {
+            flex: 1; background-color: #FFFFFF; margin: 20px 20px 20px 0; border-radius: 16px; box-shadow: 0 8px 24px rgba(0,0,0,0.04); position: relative; overflow: hidden;
+        }
+        
+        .hint-text { position: absolute; top: 20px; left: 20px; font-size: 14px; font-weight: bold; color: #90A4AE; background: rgba(255,255,255,0.8); padding: 6px 12px; border-radius: 8px; z-index: 5; pointer-events: none;}
+
+        #canvas-container { width: 100%; height: 100%; position: absolute; top: 0; left: 0; z-index: 1; cursor: grab; }
+        #canvas-container:active { cursor: grabbing; }
+        
+        /* HTML 数据标签，跟随 3D 锚点 */
+        .label-3d {
+            position: absolute; font-size: 15px; font-weight: bold; color: #333;
+            background: rgba(255, 255, 255, 0.9); padding: 2px 8px; border-radius: 4px;
+            border: 1px solid #CCC; transform: translate(-50%, -50%);
+            pointer-events: none; transition: opacity 0.2s; z-index: 2; box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .label-highlight { background: #FFF3E0; color: #E65100; border-color: #FF9800; font-size: 16px; }
+
+        .watermark {
+            position: absolute; right: 25px; bottom: 20px; font-size: 32px; font-weight: bold; color: rgba(0, 0, 0, 0.04); letter-spacing: 2px; pointer-events: none; z-index: 3;
+        }
+    </style>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+</head>
+<body>
+
+    <div id="control-panel">
+        <div class="header">
+            <h1>排水法求体积演示仪</h1>
+            <div style="font-size: 12px; color: #78909C; margin-top: 5px;">对应：人教版五年级下册 P41 第7题</div>
+        </div>
+
+        <div class="sliders-container">
+            <div class="slider-group">
+                <div class="slider-header"><span>底面长</span><span class="slider-val" id="val-l">8 cm</span></div>
+                <input type="range" id="sl-l" min="4" max="15" value="8" oninput="updateParam('l', this.value)">
+            </div>
+            <div class="slider-group">
+                <div class="slider-header"><span>底面宽</span><span class="slider-val" id="val-w">8 cm</span></div>
+                <input type="range" id="sl-w" min="4" max="15" value="8" oninput="updateParam('w', this.value)">
+            </div>
+            <div class="slider-group">
+                <div class="slider-header"><span>初始水深</span><span class="slider-val" id="val-h1">6 cm</span></div>
+                <input type="range" id="sl-h1" min="2" max="10" value="6" oninput="updateParam('h1', this.value)">
+            </div>
+            <div class="slider-group">
+                <div class="slider-header"><span>放入后水深</span><span class="slider-val" id="val-h2" style="color:#E65100;">8 cm</span></div>
+                <input type="range" id="sl-h2" min="3" max="15" value="8" oninput="updateParam('h2', this.value)">
+            </div>
+        </div>
+
+        <div class="btn-group">
+            <button class="btn btn-play" id="btn-play" onclick="playStep()">▶ 分步演示</button>
+            <button class="btn btn-reset" onclick="resetState()">↻ 捞出石头重置</button>
+        </div>
+
+        <div class="formula-card">
+            <div class="f-step" id="step-1">
+                ① 玻璃缸底面积
+                <span class="f-val" id="f-area">8 × 8 = 64 cm²</span>
+            </div>
+            <div class="f-step f-hidden" id="step-2">
+                ② 水面上升高度
+                <span class="f-val" id="f-rise">8 - 6 = 2 cm</span>
+            </div>
+            <div class="f-step f-hidden" id="step-3">
+                ③ 不规则石头的体积
+                <span class="f-val f-highlight" id="f-vol">= 64 × 2 = 128 cm³</span>
+            </div>
+        </div>
+    </div>
+
+    <div id="display-area">
+        <div class="hint-text">💡 提示：按住鼠标左键可旋转 3D 水箱，滚轮可缩放</div>
+        <div id="canvas-container"></div>
+        
+        <div id="lbl-l" class="label-3d">长 8</div>
+        <div id="lbl-w" class="label-3d">宽 8</div>
+        <div id="lbl-h1" class="label-3d">初始水深 6</div>
+        <div id="lbl-rise" class="label-3d label-highlight" style="opacity: 0;">上升 2</div>
+
+        <div class="watermark">安安老师</div>
+    </div>
+
+    <script>
+        // --- 核心数据状态 ---
+        let params = { l: 8, w: 8, h1: 6, h2: 8, maxH: 16 };
+        let animState = {
+            step: 0, // 0: 初始, 1: 石头下落+水面上升, 2: 高亮上升水层
+            rockY: 15,
+            targetRockY: 15,
+            riseH: 0,
+            targetRiseH: 0,
+            highlightColor: new THREE.Color(0x29B6F6) // 初始与水同色
+        };
+
+        // --- Three.js 对象 ---
+        let scene, camera, renderer, controls;
+        let tankGroup, baseWaterMesh, riseWaterMesh, rockMesh;
+        const container = document.getElementById('canvas-container');
+
+        function init3D() {
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color(0xFFFFFF);
+
+            camera = new THREE.PerspectiveCamera(45, container.clientWidth / container.clientHeight, 0.1, 1000);
+            camera.position.set(20, 15, 25);
+
+            renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+            renderer.setSize(container.clientWidth, container.clientHeight);
+            renderer.setPixelRatio(window.devicePixelRatio);
+            container.appendChild(renderer.domElement);
+
+            controls = new THREE.OrbitControls(camera, renderer.domElement);
+            controls.enableDamping = true;
+            controls.target.set(0, 5, 0);
+
+            // 灯光
+            scene.add(new THREE.AmbientLight(0xffffff, 0.7));
+            const dirLight = new THREE.DirectionalLight(0xffffff, 0.6);
+            dirLight.position.set(10, 20, 15);
+            scene.add(dirLight);
+
+            // 辅助网格底盘
+            scene.add(new THREE.GridHelper(40, 40, 0xcccccc, 0xeeeeee));
+
+            // 1. 玻璃水箱框
+            tankGroup = new THREE.Group();
+            scene.add(tankGroup);
+            const boxGeo = new THREE.BoxGeometry(1, 1, 1);
+            const edgesGeo = new THREE.EdgesGeometry(boxGeo);
+            const tankEdges = new THREE.LineSegments(edgesGeo, new THREE.LineBasicMaterial({ color: 0x90A4AE, linewidth: 2 }));
+            
+            const glassMat = new THREE.MeshPhongMaterial({ color: 0xE1F5FE, transparent: true, opacity: 0.15, side: THREE.DoubleSide });
+            const glassMesh = new THREE.Mesh(boxGeo, glassMat);
+            tankGroup.add(tankEdges);
+            tankGroup.add(glassMesh);
+
+            // 2. 基础水体
+            const baseWaterMat = new THREE.MeshPhongMaterial({ color: 0x29B6F6, transparent: true, opacity: 0.6 });
+            baseWaterMesh = new THREE.Mesh(boxGeo, baseWaterMat);
+            scene.add(baseWaterMesh);
+
+            // 3. 上升的那层水体 (核心展示物)
+            const riseWaterMat = new THREE.MeshPhongMaterial({ color: 0x29B6F6, transparent: true, opacity: 0.8 });
+            riseWaterMesh = new THREE.Mesh(boxGeo, riseWaterMat);
+            scene.add(riseWaterMesh);
+
+            // 4. 不规则石头模型 (用二十面体模拟)
+            const rockGeo = new THREE.DodecahedronGeometry(1.5, 1);
+            // 随便给顶点做点随机偏移让它看起来更像石头
+            const posAttr = rockGeo.attributes.position;
+            for(let i=0; i<posAttr.count; i++) {
+                posAttr.setY(i, posAttr.getY(i) + (Math.random()-0.5)*0.5);
+            }
+            rockGeo.computeVertexNormals();
+            const rockMat = new THREE.MeshPhongMaterial({ color: 0x78909C, flatShading: true });
+            rockMesh = new THREE.Mesh(rockGeo, rockMat);
+            scene.add(rockMesh);
+
+            window.addEventListener('resize', () => {
+                camera.aspect = container.clientWidth / container.clientHeight;
+                camera.updateProjectionMatrix();
+                renderer.setSize(container.clientWidth, container.clientHeight);
+            });
+
+            updateGeometries();
+            animate();
+        }
+
+        function updateParam(key, value) {
+            let val = parseFloat(value);
+            params[key] = val;
+            
+            // 逻辑约束：放入后的水深必须大于初始水深
+            if (key === 'h1' && params.h1 >= params.h2) {
+                params.h2 = params.h1 + 1;
+                document.getElementById('sl-h2').value = params.h2;
+            }
+            if (key === 'h2' && params.h2 <= params.h1) {
+                params.h1 = params.h2 - 1;
+                if(params.h1 < 1) params.h1 = 1;
+                document.getElementById('sl-h1').value = params.h1;
+            }
+
+            document.getElementById('val-l').innerText = `${params.l} cm`;
+            document.getElementById('val-w').innerText = `${params.w} cm`;
+            document.getElementById('val-h1').innerText = `${params.h1} cm`;
+            document.getElementById('val-h2').innerText = `${params.h2} cm`;
+
+            resetState(); // 调参数时重置演示
+        }
+
+        function playStep() {
+            if (animState.step === 0) {
+                // 第一步：石头落水，水面上升
+                animState.step = 1;
+                animState.targetRockY = 2; // 沉底
+                animState.targetRiseH = params.h2 - params.h1; // 水面上升差值
+                document.getElementById('btn-play').innerText = "▶ 高亮上升水体";
+                document.getElementById('step-2').classList.remove('f-hidden');
+            } else if (animState.step === 1) {
+                // 第二步：高亮排出的水，揭晓结果
+                animState.step = 2;
+                // 变成果冻橙色
+                animState.highlightColor.setHex(0xFF9800); 
+                document.getElementById('btn-play').innerText = "演示完成";
+                document.getElementById('btn-play').disabled = true;
+                document.getElementById('step-3').classList.remove('f-hidden');
+                document.getElementById('lbl-rise').style.opacity = 1;
+            }
+        }
+
+        function resetState() {
+            animState.step = 0;
+            animState.targetRockY = params.maxH + 2;
+            animState.targetRiseH = 0;
+            animState.highlightColor.setHex(0x29B6F6); // 恢复蓝色
+            
+            document.getElementById('btn-play').innerText = "▶ 分步演示（放入石头）";
+            document.getElementById('btn-play').disabled = false;
+            
+            document.getElementById('step-2').classList.add('f-hidden');
+            document.getElementById('step-3').classList.add('f-hidden');
+            document.getElementById('lbl-rise').style.opacity = 0;
+
+            updateGeometries();
+        }
+
+        function updateGeometries() {
+            const { l, w, h1, h2, maxH } = params;
+
+            // 更新数学算式
+            const area = l * w;
+            const rise = h2 - h1;
+            const vol = area * rise;
+            document.getElementById('f-area').innerText = `${l} × ${w} = ${area} cm²`;
+            document.getElementById('f-rise').innerText = `${h2} - ${h1} = ${rise} cm`;
+            document.getElementById('f-vol').innerText = `= ${area} × ${rise} = ${vol} cm³`;
+
+            // 水箱尺寸
+            tankGroup.scale.set(l, maxH, w);
+            tankGroup.position.y = maxH / 2;
+
+            // 基础水体尺寸
+            baseWaterMesh.scale.set(l - 0.05, h1, w - 0.05);
+            baseWaterMesh.position.y = h1 / 2;
+            
+            // 标签文本
+            document.getElementById('lbl-l').innerText = `长 ${l}`;
+            document.getElementById('lbl-w').innerText = `宽 ${w}`;
+            document.getElementById('lbl-h1').innerText = `初始深 ${h1}`;
+            document.getElementById('lbl-rise').innerText = `上升 ${rise}`;
+        }
+
+        // 处理 3D 坐标到 2D HTML 标签的映射
+        function updateLabels() {
+            const { l, w, h1 } = params;
+            
+            const toScreen = (pos3D) => {
+                const vec = pos3D.clone().project(camera);
+                return {
+                    x: (vec.x * .5 + .5) * container.clientWidth,
+                    y: (vec.y * -.5 + .5) * container.clientHeight,
+                    z: vec.z
+                };
+            };
+
+            const setLabel = (el, pos3D, offsetX=0, offsetY=0) => {
+                const sc = toScreen(pos3D);
+                if(sc.z > 1) { el.style.display = 'none'; return; }
+                el.style.display = 'block';
+                el.style.left = `${sc.x + offsetX}px`;
+                el.style.top = `${sc.y + offsetY}px`;
+            };
+
+            setLabel(document.getElementById('lbl-l'), new THREE.Vector3(0, 0, w/2), 0, 20);
+            setLabel(document.getElementById('lbl-w'), new THREE.Vector3(l/2, 0, 0), 20, 10);
+            setLabel(document.getElementById('lbl-h1'), new THREE.Vector3(-l/2, h1/2, w/2), -40, 0);
+            
+            // 上升水体的标签跟随其中心点
+            const currentRiseH = riseWaterMesh.scale.y;
+            if(currentRiseH > 0.1 && animState.step === 2) {
+                setLabel(document.getElementById('lbl-rise'), new THREE.Vector3(l/2, h1 + currentRiseH/2, w/2), 35, 0);
+            }
+        }
+
+        function animate() {
+            requestAnimationFrame(animate);
+
+            // 平滑缓动动画
+            animState.rockY += (animState.targetRockY - animState.rockY) * 0.08;
+            animState.riseH += (animState.targetRiseH - animState.riseH) * 0.08;
+            
+            // 颜色平滑过渡
+            riseWaterMesh.material.color.lerp(animState.highlightColor, 0.05);
+
+            rockMesh.position.y = animState.rockY;
+            // 让石头自转一点点显得自然
+            if(animState.step === 1 && Math.abs(animState.targetRockY - animState.rockY) > 0.1) {
+                rockMesh.rotation.x += 0.05;
+                rockMesh.rotation.y += 0.02;
+            }
+
+            const { l, w, h1 } = params;
+            // 渲染上升的水体
+            if(animState.riseH > 0.01) {
+                riseWaterMesh.visible = true;
+                riseWaterMesh.scale.set(l - 0.04, animState.riseH, w - 0.04);
+                // 紧紧叠在基础水体之上
+                riseWaterMesh.position.y = h1 + animState.riseH / 2;
+            } else {
+                riseWaterMesh.visible = false;
+            }
+
+            controls.update();
+            updateLabels();
+            renderer.render(scene, camera);
+        }
+
+        window.onload = () => {
+            init3D();
+            resetState();
+        };
+    </script>
+</body>
+</html>
