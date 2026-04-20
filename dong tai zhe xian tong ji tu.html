@@ -1,0 +1,331 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>动态折线统计图 - 安安老师教研站</title>
+    <style>
+        :root {
+            --primary: #4FC3F7;       /* 鲜艳马卡龙蓝 */
+            --primary-dark: #0288D1;
+            --area-fill: rgba(79, 195, 247, 0.2);
+            --bg-color: #F4F7F6;
+            --panel-bg: #FFFFFF;
+            --text-main: #333333;
+            --border-color: #E0E0E0;
+            
+            --trend-up: #FF5252;      /* 上升红 */
+            --trend-down: #4CAF50;    /* 下降绿 */
+            --trend-flat: #9E9E9E;    /* 平稳灰 */
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+            font-family: 'PingFang SC', 'Microsoft YaHei', sans-serif;
+            background-color: var(--bg-color);
+            display: flex;
+            height: 100vh;
+            overflow: hidden;
+            color: var(--text-main);
+        }
+
+        /* 左侧控制区 1/3 */
+        #control-panel {
+            width: 32%;
+            min-width: 340px;
+            background-color: var(--panel-bg);
+            margin: 20px;
+            border-radius: 16px;
+            box-shadow: 0 8px 24px rgba(0,0,0,0.06);
+            display: flex;
+            flex-direction: column;
+            padding: 25px;
+            z-index: 10;
+        }
+
+        .header { text-align: center; margin-bottom: 20px; padding-bottom: 15px; border-bottom: 2px dashed #eee; }
+        .header h1 { font-size: 22px; color: var(--primary-dark); letter-spacing: 1px; font-weight: bold; }
+
+        /* 状态看板 */
+        .status-board {
+            background: #F9FAFB; border: 1px solid #E5E7EB; border-radius: 12px; padding: 15px;
+            margin-bottom: 20px; display: grid; grid-template-columns: 1fr 1fr; gap: 10px;
+        }
+        .status-item { display: flex; flex-direction: column; align-items: center; background: #fff; padding: 10px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.02);}
+        .status-item.full-width { grid-column: span 2; }
+        .status-label { font-size: 13px; color: #666; font-weight: bold; margin-bottom: 5px; }
+        .status-value { font-size: 20px; font-weight: bold; color: var(--primary-dark); }
+        .trend-up { color: var(--trend-up); }
+        .trend-down { color: var(--trend-down); }
+        .trend-flat { color: var(--trend-flat); }
+
+        /* 滑块控制区 */
+        .sliders-container { flex: 1; overflow-y: auto; padding-right: 5px; }
+        .slider-group { margin-bottom: 18px; }
+        .slider-header { display: flex; justify-content: space-between; margin-bottom: 8px; font-size: 14px; font-weight: bold; color: #555; }
+        .slider-val { color: var(--primary-dark); }
+        
+        input[type=range] {
+            width: 100%; height: 6px; background: #E0E0E0; border-radius: 3px; outline: none; -webkit-appearance: none; cursor: pointer;
+        }
+        input[type=range]::-webkit-slider-thumb {
+            -webkit-appearance: none; width: 20px; height: 20px; border-radius: 50%;
+            background: var(--primary-dark); box-shadow: 0 2px 5px rgba(0,0,0,0.2); transition: 0.1s;
+        }
+        input[type=range]::-webkit-slider-thumb:active { transform: scale(1.2); }
+
+        .btn-reset {
+            margin-top: 15px; padding: 14px; font-size: 16px; font-weight: bold;
+            border: none; border-radius: 10px; cursor: pointer; transition: all 0.2s;
+            background-color: #FFEBEE; color: #D32F2F;
+        }
+        .btn-reset:hover { background-color: #FFCDD2; }
+
+        /* 右侧展示区 2/3 */
+        #display-area {
+            flex: 1; background-color: #FFFFFF; margin: 20px 20px 20px 0; border-radius: 16px; box-shadow: 0 8px 24px rgba(0,0,0,0.04); position: relative; padding: 20px; display: flex; flex-direction: column;
+        }
+        
+        .chart-title { text-align: center; font-size: 20px; font-weight: bold; color: #333; margin-top: 10px; margin-bottom: 10px; }
+
+        #svg-container { flex: 1; width: 100%; height: 100%; position: relative; }
+        svg { width: 100%; height: 100%; overflow: visible; }
+
+        /* SVG 元素动画与样式 */
+        .grid-line { stroke: #EEEEEE; stroke-width: 1.5; }
+        .axis-line { stroke: #90A4AE; stroke-width: 2; }
+        .axis-text { fill: #78909C; font-size: 14px; font-weight: bold; text-anchor: middle; }
+        .axis-text-y { text-anchor: end; dominant-baseline: middle; }
+        
+        .data-area { fill: var(--area-fill); transition: all 0.4s cubic-bezier(0.25, 0.8, 0.25, 1); }
+        .data-line { fill: none; stroke: var(--primary); stroke-width: 4; stroke-linejoin: round; stroke-linecap: round; transition: all 0.4s cubic-bezier(0.25, 0.8, 0.25, 1); }
+        
+        .data-point { fill: #FFFFFF; stroke: var(--primary-dark); stroke-width: 3; transition: all 0.4s cubic-bezier(0.25, 0.8, 0.25, 1); cursor: pointer; }
+        .data-point:hover { transform: scale(1.5); transform-origin: center; }
+        
+        .data-label { fill: var(--primary-dark); font-size: 16px; font-weight: bold; text-anchor: middle; transition: all 0.4s cubic-bezier(0.25, 0.8, 0.25, 1); }
+
+        .watermark {
+            position: absolute; right: 25px; bottom: 20px; font-size: 32px; font-weight: bold; color: rgba(0, 0, 0, 0.04); letter-spacing: 2px; pointer-events: none; user-select: none; z-index: 1;
+        }
+
+    </style>
+</head>
+<body>
+
+    <div id="control-panel">
+        <div class="header">
+            <h1>折线统计图探究</h1>
+        </div>
+
+        <div class="status-board">
+            <div class="status-item">
+                <span class="status-label">最高气温</span>
+                <span class="status-value" id="stat-max">35℃</span>
+            </div>
+            <div class="status-item">
+                <span class="status-label">最低气温</span>
+                <span class="status-value" id="stat-min">10℃</span>
+            </div>
+            <div class="status-item full-width">
+                <span class="status-label">上半年整体趋势</span>
+                <span class="status-value" id="stat-trend">大幅上升 ↗</span>
+            </div>
+        </div>
+
+        <div class="sliders-container" id="sliders-container">
+            </div>
+
+        <button class="btn-reset" onclick="resetData()">↻ 恢复初始数据</button>
+    </div>
+
+    <div id="display-area">
+        <div class="chart-title">某市上半年月平均气温变化统计图</div>
+        <div id="svg-container">
+            <svg id="chart-svg" viewBox="0 0 800 500" preserveAspectRatio="none">
+                <g id="grid-layer"></g>
+                <g id="data-layer">
+                    <polygon class="data-area" id="chart-area" points=""></polygon>
+                    <polyline class="data-line" id="chart-line" points=""></polyline>
+                    <g id="points-layer"></g>
+                    <g id="labels-layer"></g>
+                </g>
+            </svg>
+        </div>
+        <div class="watermark">安安老师</div>
+    </div>
+
+    <script>
+        // 核心数据
+        const months = ['1月', '2月', '3月', '4月', '5月', '6月'];
+        const initialData = [10, 15, 25, 30, 28, 35];
+        let currentData = [...initialData];
+
+        // 图表坐标系配置 (基于 viewBox 800x500)
+        const PADDING = { top: 40, right: 40, bottom: 40, left: 60 };
+        const W = 800;
+        const H = 500;
+        const chartW = W - PADDING.left - PADDING.right;
+        const chartH = H - PADDING.top - PADDING.bottom;
+        const MAX_VAL = 40; // Y轴最大值
+
+        // DOM 元素
+        const slidersContainer = document.getElementById('sliders-container');
+        const chartLine = document.getElementById('chart-line');
+        const chartArea = document.getElementById('chart-area');
+        const pointsLayer = document.getElementById('points-layer');
+        const labelsLayer = document.getElementById('labels-layer');
+
+        // 初始化左侧滑块
+        function initSliders() {
+            slidersContainer.innerHTML = '';
+            months.forEach((month, index) => {
+                const group = document.createElement('div');
+                group.className = 'slider-group';
+                group.innerHTML = `
+                    <div class="slider-header">
+                        <span>${month} 气温</span>
+                        <span class="slider-val" id="val-${index}">${currentData[index]}℃</span>
+                    </div>
+                    <input type="range" min="0" max="${MAX_VAL}" value="${currentData[index]}" 
+                           oninput="onSliderMove(${index}, this.value)">
+                `;
+                slidersContainer.appendChild(group);
+            });
+        }
+
+        // 初始化右侧静态网格和坐标轴
+        function initGrid() {
+            const gridLayer = document.getElementById('grid-layer');
+            let gridHTML = '';
+
+            // Y轴及横向网格线 (每10℃一格)
+            for (let v = 0; v <= MAX_VAL; v += 10) {
+                const y = PADDING.top + chartH - (v / MAX_VAL) * chartH;
+                gridHTML += `<line class="grid-line" x1="${PADDING.left}" y1="${y}" x2="${W - PADDING.right}" y2="${y}" />`;
+                gridHTML += `<text class="axis-text axis-text-y" x="${PADDING.left - 10}" y="${y}">${v}</text>`;
+            }
+
+            // X轴及刻度名称
+            const stepX = chartW / (months.length - 1);
+            months.forEach((month, i) => {
+                const x = PADDING.left + i * stepX;
+                gridHTML += `<line class="grid-line" x1="${x}" y1="${PADDING.top}" x2="${x}" y2="${H - PADDING.bottom}" stroke-dasharray="4 4"/>`;
+                gridHTML += `<text class="axis-text" x="${x}" y="${H - PADDING.bottom + 25}">${month}</text>`;
+            });
+
+            // 绘制主坐标轴线
+            gridHTML += `<line class="axis-line" x1="${PADDING.left}" y1="${PADDING.top}" x2="${PADDING.left}" y2="${H - PADDING.bottom}" />`; // Y轴
+            gridHTML += `<line class="axis-line" x1="${PADDING.left}" y1="${H - PADDING.bottom}" x2="${W - PADDING.right}" y2="${H - PADDING.bottom}" />`; // X轴
+            
+            // 轴单位
+            gridHTML += `<text class="axis-text" x="${PADDING.left - 10}" y="${PADDING.top - 15}">单位/℃</text>`;
+
+            gridLayer.innerHTML = gridHTML;
+            
+            // 预创建点和文本元素
+            pointsLayer.innerHTML = '';
+            labelsLayer.innerHTML = '';
+            for(let i=0; i<months.length; i++){
+                pointsLayer.innerHTML += `<circle class="data-point" id="pt-${i}" r="6" />`;
+                labelsLayer.innerHTML += `<text class="data-label" id="lbl-${i}"></text>`;
+            }
+        }
+
+        // 滑块拖动事件
+        function onSliderMove(index, value) {
+            currentData[index] = parseInt(value);
+            document.getElementById(`val-${index}`).innerText = `${value}℃`;
+            updateChart();
+        }
+
+        // 重置数据
+        function resetData() {
+            currentData = [...initialData];
+            initSliders();
+            updateChart();
+        }
+
+        // 核心更新逻辑：更新图表及趋势面板
+        function updateChart() {
+            const stepX = chartW / (months.length - 1);
+            let pointsArr = [];
+            let areaPoints = `${PADDING.left},${H - PADDING.bottom} `; // 阴影起点 (左下角)
+
+            let maxVal = -Infinity;
+            let minVal = Infinity;
+
+            for (let i = 0; i < months.length; i++) {
+                const val = currentData[i];
+                // 统计极值
+                if(val > maxVal) maxVal = val;
+                if(val < minVal) minVal = val;
+
+                const x = PADDING.left + i * stepX;
+                const y = PADDING.top + chartH - (val / MAX_VAL) * chartH;
+                
+                pointsArr.push(`${x},${y}`);
+                areaPoints += `${x},${y} `;
+
+                // 更新圆点
+                const pt = document.getElementById(`pt-${i}`);
+                pt.setAttribute('cx', x);
+                pt.setAttribute('cy', y);
+
+                // 更新标签
+                const lbl = document.getElementById(`lbl-${i}`);
+                lbl.setAttribute('x', x);
+                lbl.setAttribute('y', y - 15);
+                lbl.textContent = val;
+            }
+
+            areaPoints += `${W - PADDING.right},${H - PADDING.bottom}`; // 阴影终点 (右下角)
+
+            // 更新折线与阴影面积
+            chartLine.setAttribute('points', pointsArr.join(' '));
+            chartArea.setAttribute('points', areaPoints);
+
+            // 更新左侧分析面板
+            document.getElementById('stat-max').innerText = `${maxVal}℃`;
+            document.getElementById('stat-min').innerText = `${minVal}℃`;
+
+            updateTrend();
+        }
+
+        // 智能趋势分析
+        function updateTrend() {
+            const first = currentData[0];
+            const last = currentData[currentData.length - 1];
+            const diff = last - first;
+            const trendEl = document.getElementById('stat-trend');
+            
+            trendEl.className = 'status-value'; // 清除旧样式
+
+            if (diff > 5) {
+                trendEl.innerText = '明显上升 ↗';
+                trendEl.classList.add('trend-up');
+            } else if (diff > 0) {
+                trendEl.innerText = '缓慢上升 ↗';
+                trendEl.classList.add('trend-up');
+            } else if (diff < -5) {
+                trendEl.innerText = '明显下降 ↘';
+                trendEl.classList.add('trend-down');
+            } else if (diff < 0) {
+                trendEl.innerText = '缓慢下降 ↘';
+                trendEl.classList.add('trend-down');
+            } else {
+                trendEl.innerText = '保持平稳 ➔';
+                trendEl.classList.add('trend-flat');
+            }
+        }
+
+        // 初始化启动
+        window.onload = () => {
+            initSliders();
+            initGrid();
+            updateChart();
+        };
+    </script>
+</body>
+</html>

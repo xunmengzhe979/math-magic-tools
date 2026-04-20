@@ -1,0 +1,471 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>图形旋转控制台 - 1-6年级数学通关秘籍库</title>
+    <style>
+        :root {
+            --primary: #0288D1;
+            --bg-color: #F4F7F6;
+            --panel-bg: #FFFFFF;
+            --text-main: #333333;
+            --text-sub: #666666;
+            --border-color: #E0E0E0;
+            --shadow: 0 4px 12px rgba(0,0,0,0.05);
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'PingFang SC', 'Microsoft YaHei', sans-serif;
+            background-color: var(--bg-color);
+            display: flex;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        /* 左侧控制区 (占宽1/3) */
+        #left-panel {
+            width: 320px;
+            min-width: 300px;
+            background-color: var(--panel-bg);
+            border-right: 1px solid var(--border-color);
+            display: flex;
+            flex-direction: column;
+            padding: 20px;
+            box-shadow: var(--shadow);
+            z-index: 10;
+        }
+
+        .header-title {
+            font-size: 22px;
+            color: var(--primary);
+            font-weight: bold;
+            text-align: center;
+            margin-bottom: 25px;
+            padding-bottom: 15px;
+            border-bottom: 2px dashed #eee;
+        }
+
+        .control-card {
+            background: #F9FAFB;
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 18px;
+            margin-bottom: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .control-label {
+            font-size: 15px;
+            font-weight: bold;
+            color: var(--text-main);
+        }
+
+        select {
+            width: 100%;
+            padding: 10px 12px;
+            font-size: 15px;
+            border: 1px solid #ccc;
+            border-radius: 8px;
+            outline: none;
+            background: #fff;
+            color: var(--text-main);
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        select:hover {
+            border-color: var(--primary);
+        }
+
+        .btn-group {
+            display: flex;
+            gap: 10px;
+        }
+
+        button {
+            flex: 1;
+            padding: 12px 0;
+            font-size: 14px;
+            font-weight: bold;
+            color: #fff;
+            background-color: var(--primary);
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.2s;
+            box-shadow: 0 2px 6px rgba(2, 136, 209, 0.3);
+        }
+
+        button:hover {
+            background-color: #0277BD;
+            transform: translateY(-1px);
+        }
+
+        button:active {
+            transform: translateY(1px);
+            box-shadow: none;
+        }
+
+        button.btn-reset {
+            background-color: #FF5252;
+            box-shadow: 0 2px 6px rgba(255, 82, 82, 0.3);
+            margin-top: auto;
+        }
+
+        button.btn-reset:hover {
+            background-color: #E53935;
+        }
+
+        .slider-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .angle-display {
+            font-size: 16px;
+            font-weight: bold;
+            color: var(--primary);
+        }
+
+        input[type=range] {
+            width: 100%;
+            height: 6px;
+            background: #ddd;
+            border-radius: 3px;
+            outline: none;
+            cursor: pointer;
+            -webkit-appearance: none;
+            margin-top: 10px;
+        }
+
+        input[type=range]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background: var(--primary);
+            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+            transition: 0.1s;
+        }
+
+        /* 右侧展示区 (占宽2/3) */
+        #right-panel {
+            flex: 1;
+            background-color: #ffffff;
+            position: relative;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        canvas {
+            display: block;
+        }
+
+        .watermark {
+            position: absolute;
+            bottom: 25px;
+            right: 30px;
+            font-size: 26px;
+            font-weight: bold;
+            color: #333;
+            opacity: 0.1;
+            pointer-events: none;
+            user-select: none;
+            letter-spacing: 2px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .watermark svg {
+            width: 32px;
+            height: 32px;
+            fill: currentColor;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="left-panel">
+        <div class="header-title">图形旋转控制台</div>
+
+        <div class="control-card">
+            <div class="control-label">选择图形：</div>
+            <select id="shapeSelect">
+                <option value="triangle">直角三角形</option>
+                <option value="windmill">彩色风车</option>
+                <option value="flag">小红旗</option>
+            </select>
+        </div>
+
+        <div class="control-card">
+            <div class="control-label">快捷操作：</div>
+            <div class="btn-group">
+                <button id="btnCCW">逆时针 90° ↺</button>
+                <button id="btnCW">顺时针 90° ↻</button>
+            </div>
+        </div>
+
+        <div class="control-card">
+            <div class="slider-header">
+                <div class="control-label">自由探究：</div>
+                <div class="angle-display" id="angleText">0°</div>
+            </div>
+            <input type="range" id="angleSlider" min="-180" max="180" value="0" step="1">
+        </div>
+
+        <button class="btn-reset" id="btnReset">重置图形</button>
+    </div>
+
+    <div id="right-panel">
+        <canvas id="renderCanvas"></canvas>
+        <div class="watermark">
+            <svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 3c1.66 0 3 1.34 3 3s-1.34 3-3 3-3-1.34-3-3 1.34-3 3-3zm0 14.2c-2.5 0-4.71-1.28-6-3.22.03-1.99 4-3.08 6-3.08 1.99 0 5.97 1.09 6 3.08-1.29 1.94-3.5 3.22-6 3.22z"/></svg>
+            安安老师
+        </div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('renderCanvas');
+        const ctx = canvas.getContext('2d');
+        const rightPanel = document.getElementById('right-panel');
+        
+        // 控件引用
+        const shapeSelect = document.getElementById('shapeSelect');
+        const btnCCW = document.getElementById('btnCCW');
+        const btnCW = document.getElementById('btnCW');
+        const angleSlider = document.getElementById('angleSlider');
+        const angleText = document.getElementById('angleText');
+        const btnReset = document.getElementById('btnReset');
+
+        // 状态变量
+        let currentShape = 'triangle';
+        let targetAngle = 0;   // 目标角度 (度数)
+        let currentAngle = 0;  // 当前绘制角度 (用于平滑过渡)
+        
+        // 布局参数
+        let originX, originY;
+        const gridSize = 40; // 网格大小
+
+        // 自适应屏幕大小
+        function resizeCanvas() {
+            canvas.width = rightPanel.clientWidth;
+            canvas.height = rightPanel.clientHeight;
+            originX = canvas.width / 2;
+            originY = canvas.height / 2 + 40; // 稍微靠下一点，留出上方空间
+            draw();
+        }
+        window.addEventListener('resize', resizeCanvas);
+
+        // 动画主循环
+        function animate() {
+            // 平滑插值计算 (Easing)
+            const diff = targetAngle - currentAngle;
+            if (Math.abs(diff) > 0.1) {
+                currentAngle += diff * 0.1; // 缓动系数 0.1，表现出平滑顺滑的录屏质感
+                updateSliderUI();
+                draw();
+            } else if (currentAngle !== targetAngle) {
+                currentAngle = targetAngle;
+                updateSliderUI();
+                draw();
+            }
+            requestAnimationFrame(animate);
+        }
+
+        // 更新滑块和文本
+        function updateSliderUI() {
+            let displayAngle = Math.round(currentAngle);
+            angleText.innerText = displayAngle + '°';
+            if(document.activeElement !== angleSlider) {
+                // 如果用户没有在拖拽滑块，则同步滑块位置
+                // 限制在 -180 到 180 范围内循环显示
+                let sliderVal = displayAngle % 360;
+                if(sliderVal > 180) sliderVal -= 360;
+                if(sliderVal < -180) sliderVal += 360;
+                angleSlider.value = sliderVal;
+            }
+        }
+
+        // 绘制完整场景
+        function draw() {
+            // 清空画布
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            // 1. 绘制浅灰色背景网格
+            drawGrid();
+
+            // 2. 绘制原点标记 O
+            drawOrigin();
+
+            // 3. 绘制旋转的图形
+            ctx.save();
+            ctx.translate(originX, originY);
+            // 数学中的顺逆时针与Canvas相反(Canvas的Y轴向下)，这里做数学坐标系标准转换
+            ctx.rotate(currentAngle * Math.PI / 180);
+            
+            if (currentShape === 'triangle') drawTriangle();
+            else if (currentShape === 'windmill') drawWindmill();
+            else if (currentShape === 'flag') drawFlag();
+            
+            ctx.restore();
+        }
+
+        function drawGrid() {
+            ctx.strokeStyle = '#E8ECEF';
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            
+            // 画垂直线
+            for (let x = originX % gridSize; x < canvas.width; x += gridSize) {
+                ctx.moveTo(x, 0); ctx.lineTo(x, canvas.height);
+            }
+            // 画水平线
+            for (let y = originY % gridSize; y < canvas.height; y += gridSize) {
+                ctx.moveTo(0, y); ctx.lineTo(canvas.width, y);
+            }
+            ctx.stroke();
+
+            // 画主坐标轴 (加粗)
+            ctx.strokeStyle = '#B0BEC5';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.moveTo(0, originY); ctx.lineTo(canvas.width, originY); // X轴
+            ctx.moveTo(originX, 0); ctx.lineTo(originX, canvas.height); // Y轴
+            ctx.stroke();
+        }
+
+        function drawOrigin() {
+            ctx.fillStyle = '#FF5252';
+            ctx.beginPath();
+            ctx.arc(originX, originY, 6, 0, Math.PI * 2);
+            ctx.fill();
+            
+            ctx.fillStyle = '#333';
+            ctx.font = 'bold 18px Arial';
+            ctx.fillText('O', originX - 25, originY + 25);
+        }
+
+        // --- 具体图形绘制函数 ---
+        
+        function drawTriangle() {
+            // 直角三角形 (马卡龙蓝色)
+            ctx.fillStyle = 'rgba(41, 182, 246, 0.8)';
+            ctx.strokeStyle = '#0288D1';
+            ctx.lineWidth = 3;
+            ctx.beginPath();
+            ctx.moveTo(0, 0);                 // 原点
+            ctx.lineTo(gridSize * 4, 0);      // 右侧 4格
+            ctx.lineTo(0, -gridSize * 3);     // 上方 3格 (Y轴反向)
+            ctx.closePath();
+            ctx.fill();
+            ctx.stroke();
+            
+            // 标记直角符号
+            ctx.beginPath();
+            ctx.moveTo(15, 0);
+            ctx.lineTo(15, -15);
+            ctx.lineTo(0, -15);
+            ctx.stroke();
+        }
+
+        function drawWindmill() {
+            // 彩色风车 (4个全等三角形拼合)
+            const colors = ['#FF8A80', '#FFD180', '#80D8FF', '#B9F6CA'];
+            const strokes = ['#D50000', '#FF6D00', '#0091EA', '#00C853'];
+            const size = gridSize * 3;
+
+            for (let i = 0; i < 4; i++) {
+                ctx.save();
+                ctx.rotate(i * Math.PI / 2);
+                ctx.fillStyle = colors[i];
+                ctx.strokeStyle = strokes[i];
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                ctx.moveTo(0, 0);
+                ctx.lineTo(size, 0);
+                ctx.lineTo(size, size);
+                ctx.closePath();
+                ctx.fill();
+                ctx.stroke();
+                ctx.restore();
+            }
+        }
+
+        function drawFlag() {
+            // 小红旗：旗杆 + 旗面
+            // 旗杆
+            ctx.strokeStyle = '#757575';
+            ctx.lineWidth = 6;
+            ctx.lineCap = 'round';
+            ctx.beginPath();
+            ctx.moveTo(0, 0);
+            ctx.lineTo(0, -gridSize * 5); // 杆长5格
+            ctx.stroke();
+
+            // 旗面 (红色三角形)
+            ctx.fillStyle = '#FF5252';
+            ctx.beginPath();
+            ctx.moveTo(0, -gridSize * 5);
+            ctx.lineTo(gridSize * 3, -gridSize * 4);
+            ctx.lineTo(0, -gridSize * 3);
+            ctx.closePath();
+            ctx.fill();
+        }
+
+        // --- 事件绑定 ---
+
+        shapeSelect.addEventListener('change', (e) => {
+            currentShape = e.target.value;
+            // 切换图形时，重置角度以保证视觉干净
+            targetAngle = 0;
+            currentAngle = 0;
+            draw();
+        });
+
+        // 逆时针 90°
+        btnCCW.addEventListener('click', () => {
+            targetAngle -= 90;
+        });
+
+        // 顺时针 90°
+        btnCW.addEventListener('click', () => {
+            targetAngle += 90;
+        });
+
+        // 滑块拖动实时同步
+        angleSlider.addEventListener('input', (e) => {
+            let val = parseInt(e.target.value);
+            // 以当前圈数为基准，防止滑块突变造成图形狂转
+            let loops = Math.floor(targetAngle / 360);
+            targetAngle = loops * 360 + val;
+            
+            // 为了手感更好，如果是直接拖拽滑块，图形同步“瞬间”到位，关闭缓动
+            currentAngle = targetAngle; 
+            angleText.innerText = val + '°';
+            draw();
+        });
+
+        // 重置按钮
+        btnReset.addEventListener('click', () => {
+            targetAngle = 0;
+        });
+
+        // 初始化
+        resizeCanvas();
+        animate();
+
+    </script>
+</body>
+</html>

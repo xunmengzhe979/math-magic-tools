@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>长方体体积与底面积探索工具</title>
+    <style>
+        body { margin: 0; overflow: hidden; font-family: 'Microsoft YaHei', sans-serif; background-color: #f4f7f6; display: flex; flex-direction: column; height: 100vh; }
+        #header { background: #2E7D32; color: white; padding: 15px 20px; text-align: center; box-shadow: 0 2px 5px rgba(0,0,0,0.2); z-index: 10; }
+        #header h1 { margin: 0; font-size: 22px; letter-spacing: 1px; }
+        #main { display: flex; flex: 1; overflow: hidden; }
+        #panel { width: 320px; background: white; padding: 25px; box-shadow: 2px 0 8px rgba(0,0,0,0.1); z-index: 5; display: flex; flex-direction: column; gap: 20px; overflow-y: auto; }
+        .control-group { display: flex; flex-direction: column; gap: 8px; }
+        label { font-weight: bold; color: #333; font-size: 16px; }
+        input[type=range] { width: 100%; cursor: pointer; height: 6px; background: #ddd; outline: none; border-radius: 3px; -webkit-appearance: none; }
+        input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 18px; height: 18px; background: #2E7D32; border-radius: 50%; cursor: pointer; }
+        .value-display { color: #d32f2f; font-weight: bold; font-size: 18px; float: right; }
+        .formula-box { background: #e8f5e9; padding: 15px; border-radius: 8px; border-left: 5px solid #4CAF50; }
+        .formula-box p { margin: 5px 0; font-size: 15px; color: #2e7d32; }
+        .formula-box span { font-weight: bold; font-size: 20px; color: #1b5e20; }
+        .formula-box.vol { background: #fff3e0; border-left: 5px solid #ff9800; }
+        .formula-box.vol p { color: #e65100; }
+        .formula-box.vol span { color: #e65100; }
+        #canvas-container { flex: 1; position: relative; background: radial-gradient(circle, #ffffff 0%, #e0e0e0 100%); }
+        .instruction { font-size: 13px; color: #666; margin-top: auto; line-height: 1.5; padding: 10px; background: #f9f9f9; border-radius: 6px; }
+    </style>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+</head>
+<body>
+    <div id="header">
+        <h1>📦 长方体“底面积与体积”互动探索器</h1>
+    </div>
+    <div id="main">
+        <div id="panel">
+            <div class="control-group">
+                <label>长 (a): <span id="val-a" class="value-display">4</span></label>
+                <input type="range" id="slider-a" min="1" max="10" value="4" step="1">
+            </div>
+            <div class="control-group">
+                <label>宽 (b): <span id="val-b" class="value-display">3</span></label>
+                <input type="range" id="slider-b" min="1" max="10" value="3" step="1">
+            </div>
+            <div class="control-group">
+                <label>高 (h): <span id="val-h" class="value-display">2</span></label>
+                <input type="range" id="slider-h" min="1" max="10" value="2" step="1">
+            </div>
+
+            <div class="formula-box">
+                <p><b>底面积 (S)</b> = 长 × 宽</p>
+                <p>S = <span id="calc-s">4 × 3 = 12</span></p>
+            </div>
+            
+            <div class="formula-box vol">
+                <p><b>体积 (V)</b> = 底面积 × 高</p>
+                <p>V = <span id="calc-v">12 × 2 = 24</span></p>
+            </div>
+
+            <div class="instruction">
+                💡 <b>操作指南：</b><br>
+                1. 拖动上方滑块改变长、宽、高。<br>
+                2. 观察右侧 3D 图形底面（深色区域）的变化。<br>
+                3. <b>按住鼠标左键（或手指滑动）</b>可以在右侧区域360度旋转观察长方体！
+            </div>
+        </div>
+        <div id="canvas-container"></div>
+    </div>
+
+    <script>
+        const container = document.getElementById('canvas-container');
+        const scene = new THREE.Scene();
+        const camera = new THREE.PerspectiveCamera(45, container.clientWidth / container.clientHeight, 0.1, 1000);
+        camera.position.set(15, 12, 20);
+
+        const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+        renderer.setSize(container.clientWidth, container.clientHeight);
+        renderer.shadowMap.enabled = true;
+        container.appendChild(renderer.domElement);
+
+        const controls = new THREE.OrbitControls(camera, renderer.domElement);
+        controls.enableDamping = true;
+        controls.dampingFactor = 0.05;
+
+        // 光照
+        const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+        scene.add(ambientLight);
+        const dirLight = new THREE.DirectionalLight(0xffffff, 0.8);
+        dirLight.position.set(10, 20, 10);
+        dirLight.castShadow = true;
+        scene.add(dirLight);
+
+        // 网格辅助
+        const gridHelper = new THREE.GridHelper(30, 30, 0xcccccc, 0xeaeaea);
+        gridHelper.position.y = -5;
+        scene.add(gridHelper);
+
+        let boxMesh, edgesMesh, baseMesh;
+        const group = new THREE.Group();
+        scene.add(group);
+
+        function createBox(a, b, h) {
+            if(boxMesh) { group.remove(boxMesh); group.remove(edgesMesh); group.remove(baseMesh); }
+
+            // 主体
+            const geometry = new THREE.BoxGeometry(a, h, b);
+            const material = new THREE.MeshPhongMaterial({ color: 0x81c784, transparent: true, opacity: 0.8 });
+            boxMesh = new THREE.Mesh(geometry, material);
+            boxMesh.position.y = h / 2 - 5; 
+            boxMesh.castShadow = true;
+            group.add(boxMesh);
+
+            // 线框
+            const edges = new THREE.EdgesGeometry(geometry);
+            const lineMat = new THREE.LineBasicMaterial({ color: 0x2e7d32, linewidth: 2 });
+            edgesMesh = new THREE.LineSegments(edges, lineMat);
+            edgesMesh.position.y = h / 2 - 5;
+            group.add(edgesMesh);
+
+            // 高亮底面积
+            const baseGeo = new THREE.PlaneGeometry(a, b);
+            const baseMat = new THREE.MeshBasicMaterial({ color: 0xff9800, side: THREE.DoubleSide });
+            baseMesh = new THREE.Mesh(baseGeo, baseMat);
+            baseMesh.rotation.x = Math.PI / 2;
+            baseMesh.position.y = -4.99; // 略高于网格
+            group.add(baseMesh);
+        }
+
+        function updateUI() {
+            const a = parseInt(document.getElementById('slider-a').value);
+            const b = parseInt(document.getElementById('slider-b').value);
+            const h = parseInt(document.getElementById('slider-h').value);
+
+            document.getElementById('val-a').innerText = a;
+            document.getElementById('val-b').innerText = b;
+            document.getElementById('val-h').innerText = h;
+
+            const S = a * b;
+            const V = S * h;
+
+            document.getElementById('calc-s').innerText = `${a} × ${b} = ${S}`;
+            document.getElementById('calc-v').innerText = `${S} × ${h} = ${V}`;
+
+            createBox(a, b, h);
+        }
+
+        document.getElementById('slider-a').addEventListener('input', updateUI);
+        document.getElementById('slider-b').addEventListener('input', updateUI);
+        document.getElementById('slider-h').addEventListener('input', updateUI);
+
+        window.addEventListener('resize', () => {
+            camera.aspect = container.clientWidth / container.clientHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(container.clientWidth, container.clientHeight);
+        });
+
+        function animate() {
+            requestAnimationFrame(animate);
+            controls.update();
+            renderer.render(scene, camera);
+        }
+
+        updateUI();
+        animate();
+    </script>
+</body>
+</html>

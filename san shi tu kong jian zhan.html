@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>三视图空间站 V3 - 安安老师教研站</title>
+    <style>
+        :root { --primary: #007AFF; --bg: #F2F2F7; --panel: #FFFFFF; }
+        body { margin: 0; font-family: 'PingFang SC', 'Microsoft YaHei', sans-serif; background: var(--bg); display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
+        
+        #header { background: var(--panel); padding: 15px; text-align: center; box-shadow: 0 2px 10px rgba(0,0,0,0.05); z-index: 10; }
+        #header h1 { margin: 0; font-size: 22px; color: var(--primary); letter-spacing: 1px; }
+
+        #container { flex: 1; display: flex; overflow: hidden; }
+
+        /* 左侧数字控制区 */
+        #control-left { width: 220px; background: var(--panel); display: flex; flex-direction: column; align-items: center; justify-content: center; border-right: 1px solid #E5E5EA; padding: 20px; }
+        .control-title { font-size: 16px; font-weight: bold; color: #666; margin-bottom: 20px; }
+        .num-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; width: 100%; }
+        .num-btn { aspect-ratio: 1; background: #F2F2F7; border: 2px solid #D1D1D6; border-radius: 12px; font-size: 24px; font-weight: bold; color: var(--primary); cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all 0.2s; }
+        .num-btn:active { transform: scale(0.9); background: #E5E5EA; }
+        .num-btn.active { border-color: var(--primary); background: #E8F2FF; }
+
+        /* 中间3D展示区 */
+        #canvas-3d { flex: 1; background: #FFFFFF; position: relative; }
+        .hint { position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%); background: rgba(0,0,0,0.05); padding: 5px 15px; border-radius: 15px; font-size: 13px; color: #999; pointer-events: none; }
+
+        /* 右侧视角功能区 */
+        #control-right { width: 150px; background: var(--panel); display: flex; flex-direction: column; gap: 15px; justify-content: center; padding: 20px; border-left: 1px solid #E5E5EA; }
+        .view-btn { padding: 15px; border: none; border-radius: 12px; background: var(--primary); color: white; font-size: 18px; font-weight: bold; cursor: pointer; transition: all 0.2s; box-shadow: 0 4px 6px rgba(0,122,255,0.2); }
+        .view-btn:active { transform: translateY(2px); box-shadow: none; }
+        .view-btn.reset { background: #FF3B30; box-shadow: 0 4px 6px rgba(255,59,48,0.2); }
+    </style>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+</head>
+<body>
+
+<div id="header">
+    <h1>🚀 三视图空间站 V3 (定制版)</h1>
+</div>
+
+<div id="container">
+    <div id="control-left">
+        <div class="control-title">点击调整高度</div>
+        <div class="num-grid" id="numGrid">
+            </div>
+    </div>
+
+    <div id="canvas-3d">
+        <div class="hint">鼠标左键旋转，右键平移，滚轮缩放</div>
+    </div>
+
+    <div id="control-right">
+        <button class="view-btn" onclick="setView('front')">正面</button>
+        <button class="view-btn" onclick="setView('left')">左面</button>
+        <button class="view-btn" onclick="setView('top')">上面</button>
+        <button class="view-btn reset" onclick="resetAll()">重置</button>
+    </div>
+</div>
+
+<script>
+    // 积木数据状态 3x3 矩阵
+    let data = Array(3).fill().map(() => Array(3).fill(0));
+
+    let scene, camera, renderer, controls, group;
+
+    function init3D() {
+        const container = document.getElementById('canvas-3d');
+        scene = new THREE.Scene();
+        scene.background = new THREE.Color(0xffffff);
+
+        camera = new THREE.PerspectiveCamera(40, container.clientWidth / container.clientHeight, 0.1, 1000);
+        camera.position.set(6, 5, 8);
+
+        renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setSize(container.clientWidth, container.clientHeight);
+        container.appendChild(renderer.domElement);
+
+        controls = new THREE.OrbitControls(camera, renderer.domElement);
+        controls.enableDamping = true;
+
+        // 灯光
+        scene.add(new THREE.AmbientLight(0xffffff, 0.8));
+        const light = new THREE.DirectionalLight(0xffffff, 0.5);
+        light.position.set(5, 10, 7);
+        scene.add(light);
+
+        // 辅助底板
+        const gridHelper = new THREE.GridHelper(3, 3, 0x007AFF, 0xE5E5EA);
+        gridHelper.position.y = -0.5;
+        scene.add(gridHelper);
+
+        group = new THREE.Group();
+        scene.add(group);
+
+        initControls();
+        animate();
+    }
+
+    function initControls() {
+        const gridEl = document.getElementById('numGrid');
+        for (let i = 0; i < 9; i++) {
+            const btn = document.createElement('div');
+            btn.className = 'num-btn';
+            btn.innerText = '0';
+            btn.onclick = () => {
+                const r = Math.floor(i / 3);
+                const c = i % 3;
+                data[r][c] = (data[r][c] + 1) % 5; // 最高4层
+                btn.innerText = data[r][c];
+                btn.classList.toggle('active', data[r][c] > 0);
+                updateScene();
+            };
+            gridEl.appendChild(btn);
+        }
+    }
+
+    function updateScene() {
+        group.clear();
+        const geometry = new THREE.BoxGeometry(0.95, 0.95, 0.95);
+        const material = new THREE.MeshPhongMaterial({ color: 0x007AFF });
+        const edgeGeo = new THREE.EdgesGeometry(geometry);
+        const edgeMat = new THREE.LineBasicMaterial({ color: 0xffffff });
+
+        for (let r = 0; r < 3; r++) {
+            for (let c = 0; c < 3; c++) {
+                const h = data[r][c];
+                for (let i = 0; i < h; i++) {
+                    const cube = new THREE.Mesh(geometry, material);
+                    // 坐标映射：c 为 X，i 为 Y，r 为 Z
+                    cube.position.set(c - 1, i, r - 1);
+                    const edges = new THREE.LineSegments(edgeGeo, edgeMat);
+                    cube.add(edges);
+                    group.add(cube);
+                }
+            }
+        }
+    }
+
+    // 视角切换逻辑
+    function setView(side) {
+        controls.enabled = false;
+        let targetPos = new THREE.Vector3();
+        switch(side) {
+            case 'front': targetPos.set(0, 1, 10); break; // 正面
+            case 'top': targetPos.set(0, 10, 0); break;   // 上面
+            case 'left': targetPos.set(-10, 1, 0); break; // 左面
+        }
+        
+        // 简单的相机动画过渡
+        const duration = 20;
+        let frame = 0;
+        const startPos = camera.position.clone();
+        
+        function move() {
+            frame++;
+            camera.position.lerpVectors(startPos, targetPos, frame/duration);
+            camera.lookAt(0, 0, 0);
+            if(frame < duration) {
+                requestAnimationFrame(move);
+            } else {
+                controls.enabled = true;
+            }
+        }
+        move();
+    }
+
+    function resetAll() {
+        data = Array(3).fill().map(() => Array(3).fill(0));
+        document.querySelectorAll('.num-btn').forEach(btn => {
+            btn.innerText = '0';
+            btn.classList.remove('active');
+        });
+        updateScene();
+        // 重置相机位置
+        camera.position.set(6, 5, 8);
+        camera.lookAt(0, 0, 0);
+    }
+
+    function animate() {
+        requestAnimationFrame(animate);
+        controls.update();
+        renderer.render(scene, camera);
+    }
+
+    window.addEventListener('resize', () => {
+        const container = document.getElementById('canvas-3d');
+        camera.aspect = container.clientWidth / container.clientHeight;
+        camera.updateProjectionMatrix();
+        renderer.setSize(container.clientWidth, container.clientHeight);
+    });
+
+    init3D();
+</script>
+</body>
+</html>

@@ -1,0 +1,309 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>埃氏筛法找质数 - 安安老师教研站</title>
+    <style>
+        :root {
+            --primary: #4FC3F7;       /* 默认主题色 */
+            --bg-color: #F4F7F6;      /* 背景灰 */
+            --panel-bg: #FFFFFF;      /* 面板白 */
+            --text-main: #333333;
+            
+            /* 质数专属马卡龙色 */
+            --color-2: #FF8A65;       /* 珊瑚红 */
+            --color-3: #AED581;       /* 嫩草绿 */
+            --color-5: #FFD54F;       /* 向日葵黄 */
+            --color-7: #BA68C8;       /* 梦幻紫 */
+            --color-prime: #4DD0E1;   /* 最终质数 湖蓝 */
+            --color-crossed: #E0E0E0; /* 划去的合数 灰 */
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+            font-family: 'PingFang SC', 'Microsoft YaHei', sans-serif;
+            background-color: var(--bg-color);
+            display: flex;
+            height: 100vh;
+            overflow: hidden;
+            color: var(--text-main);
+        }
+
+        /* 左侧控制区 1/3 */
+        #control-panel {
+            width: 30%;
+            min-width: 320px;
+            background-color: var(--panel-bg);
+            margin: 20px;
+            border-radius: 16px;
+            box-shadow: 0 8px 24px rgba(0,0,0,0.06);
+            display: flex;
+            flex-direction: column;
+            padding: 30px;
+            z-index: 10;
+        }
+
+        .header { text-align: center; margin-bottom: 25px; padding-bottom: 15px; border-bottom: 2px dashed #eee; }
+        .header h1 { font-size: 22px; color: #0288D1; letter-spacing: 1px; font-weight: bold; }
+
+        .status-box {
+            background: #F9FAFB; border: 1px solid #E5E7EB; border-radius: 12px; padding: 20px; margin-bottom: 20px;
+        }
+        .status-title { font-size: 14px; color: #666; font-weight: bold; margin-bottom: 10px; }
+        .status-text { font-size: 18px; color: #0288D1; font-weight: bold; min-height: 54px; line-height: 1.5; }
+
+        .btn-group { display: flex; flex-direction: column; gap: 12px; margin-top: auto; }
+        
+        .btn {
+            padding: 15px; font-size: 16px; font-weight: bold; border: none; border-radius: 10px; cursor: pointer; transition: all 0.2s; display: flex; align-items: center; justify-content: center; gap: 8px;
+        }
+        .btn-next { background-color: #0288D1; color: white; box-shadow: 0 4px 10px rgba(2,136,209,0.3); }
+        .btn-next:hover { background-color: #0277BD; transform: translateY(-2px); }
+        .btn-next:active { transform: translateY(0); }
+        .btn-next:disabled { background-color: #BDBDBD; cursor: not-allowed; box-shadow: none; transform: none; }
+        
+        .btn-auto { background-color: #E1F5FE; color: #0288D1; }
+        .btn-auto:hover { background-color: #B3E5FC; }
+        .btn-auto:disabled { background-color: #F5F5F5; color: #9E9E9E; cursor: not-allowed; }
+
+        .btn-reset { background-color: #FFEBEE; color: #D32F2F; margin-top: 10px; }
+        .btn-reset:hover { background-color: #FFCDD2; }
+
+        /* 右侧展示区 2/3 */
+        #display-area {
+            flex: 1; background-color: #FFFFFF; margin: 20px 20px 20px 0; border-radius: 16px; box-shadow: 0 8px 24px rgba(0,0,0,0.04); position: relative; display: flex; justify-content: center; align-items: center; overflow: hidden; padding: 20px;
+        }
+
+        .watermark { position: absolute; right: 25px; bottom: 20px; font-size: 32px; font-weight: bold; color: rgba(0, 0, 0, 0.04); letter-spacing: 2px; pointer-events: none; user-select: none; z-index: 1; }
+
+        /* 百数表网格核心布局 */
+        #grid-container {
+            display: grid;
+            grid-template-columns: repeat(10, 1fr);
+            gap: 6px;
+            width: 100%;
+            max-width: 650px;
+            aspect-ratio: 1 / 1;
+            z-index: 2;
+        }
+
+        /* 单元格初始样式 */
+        .cell {
+            background-color: #F5F5F5;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 20px;
+            font-weight: bold;
+            color: #424242;
+            transition: all 0.4s cubic-bezier(0.25, 0.8, 0.25, 1);
+            position: relative;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.02);
+        }
+
+        /* 划掉合数的状态 */
+        .cell.crossed {
+            background-color: var(--color-crossed);
+            color: #9E9E9E;
+            transform: scale(0.92);
+            box-shadow: none;
+        }
+        /* 划线伪元素 */
+        .cell.crossed::after {
+            content: '';
+            position: absolute;
+            width: 80%;
+            height: 3px;
+            background-color: #EF5350;
+            transform: rotate(-45deg);
+            border-radius: 2px;
+            opacity: 0;
+            animation: slash 0.3s forwards;
+        }
+
+        @keyframes slash {
+            to { opacity: 0.8; }
+        }
+
+        /* 圈出质数的状态 */
+        .cell.circled {
+            color: white;
+            transform: scale(1.1);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+            z-index: 5;
+        }
+
+        /* 动态注入颜色 */
+        .color-2 { background-color: var(--color-2) !important; }
+        .color-3 { background-color: var(--color-3) !important; }
+        .color-5 { background-color: var(--color-5) !important; }
+        .color-7 { background-color: var(--color-7) !important; }
+        .color-prime { background-color: var(--color-prime) !important; color: white !important; transform: scale(1.05); box-shadow: 0 4px 10px rgba(77, 208, 225, 0.4); border: 2px solid #fff;}
+
+    </style>
+</head>
+<body>
+
+    <div id="control-panel">
+        <div class="header">
+            <h1>埃氏筛法找质数</h1>
+        </div>
+
+        <div class="status-box">
+            <div class="status-title">当前步骤：</div>
+            <div class="status-text" id="statusText">初始状态：100以内的自然数表。准备开始筛选！</div>
+        </div>
+
+        <div class="btn-group">
+            <button class="btn btn-next" id="btnNext" onclick="nextStep()">步进：下一步 ➔</button>
+            <button class="btn btn-auto" id="btnAuto" onclick="autoPlay()">▶ 一键自动演示</button>
+            <button class="btn btn-reset" onclick="resetGrid()">↻ 重置百数表</button>
+        </div>
+    </div>
+
+    <div id="display-area">
+        <div id="grid-container"></div>
+        <div class="watermark">安安老师</div>
+    </div>
+
+    <script>
+        const gridContainer = document.getElementById('grid-container');
+        const statusText = document.getElementById('statusText');
+        const btnNext = document.getElementById('btnNext');
+        const btnAuto = document.getElementById('btnAuto');
+
+        let currentStep = 0;
+        let isAutoPlaying = false;
+
+        // 初始化百数表
+        function initGrid() {
+            gridContainer.innerHTML = '';
+            for (let i = 1; i <= 100; i++) {
+                const cell = document.createElement('div');
+                cell.className = 'cell';
+                cell.id = `cell-${i}`;
+                cell.innerText = i;
+                gridContainer.appendChild(cell);
+            }
+        }
+
+        // 辅助睡眠函数 (控制动画节奏)
+        const sleep = ms => new Promise(r => setTimeout(r, ms));
+
+        // 重置
+        function resetGrid() {
+            isAutoPlaying = false;
+            currentStep = 0;
+            btnNext.disabled = false;
+            btnAuto.disabled = false;
+            statusText.innerText = '初始状态：100以内的自然数表。准备开始筛选！';
+            initGrid();
+        }
+
+        // 核心筛法动画逻辑
+        async function crossOutMultiples(prime, colorClass) {
+            // 圈出当前质数
+            const pCell = document.getElementById(`cell-${prime}`);
+            pCell.classList.add('circled', colorClass);
+
+            // 瀑布流动画划去合数
+            let delayCount = 0;
+            for (let i = prime * 2; i <= 100; i += prime) {
+                const cell = document.getElementById(`cell-${i}`);
+                if (!cell.classList.contains('crossed')) {
+                    // 如果正在自动播放，但被用户中断，则跳出
+                    if (isAutoPlaying && !btnAuto.disabled) return; 
+
+                    // 延迟呈现瀑布流效果
+                    setTimeout(() => {
+                        cell.classList.add('crossed');
+                    }, delayCount * 40); 
+                    delayCount++;
+                }
+            }
+            // 等待当前动画全部播完再允许下一步
+            await sleep(delayCount * 40 + 200); 
+        }
+
+        // 步骤管理器
+        async function executeStep(stepIndex) {
+            btnNext.disabled = true; // 动画期间禁用按钮
+
+            switch (stepIndex) {
+                case 1:
+                    statusText.innerHTML = '第 1 步：<br>划掉 1。因为它既不是质数，也不是合数。';
+                    const cell1 = document.getElementById('cell-1');
+                    cell1.classList.add('crossed');
+                    await sleep(400);
+                    break;
+                case 2:
+                    statusText.innerHTML = '第 2 步：<br>圈出 2，并划掉所有 2 的倍数（偶数消失）。';
+                    await crossOutMultiples(2, 'color-2');
+                    break;
+                case 3:
+                    statusText.innerHTML = '第 3 步：<br>圈出 3，并划掉所有 3 的倍数。';
+                    await crossOutMultiples(3, 'color-3');
+                    break;
+                case 4:
+                    statusText.innerHTML = '第 4 步：<br>圈出 5，并划掉所有 5 的倍数（尾数是0或5）。';
+                    await crossOutMultiples(5, 'color-5');
+                    break;
+                case 5:
+                    statusText.innerHTML = '第 5 步：<br>圈出 7，并划掉所有 7 的倍数。';
+                    await crossOutMultiples(7, 'color-7');
+                    break;
+                case 6:
+                    statusText.innerHTML = '筛选完成！<br>剩下的数字全部是质数，让我们把它们标出来！';
+                    // 圈出剩余的所有质数
+                    let remainingCount = 0;
+                    for (let i = 2; i <= 100; i++) {
+                        const cell = document.getElementById(`cell-${i}`);
+                        if (!cell.classList.contains('crossed') && !cell.classList.contains('circled')) {
+                            setTimeout(() => {
+                                cell.classList.add('color-prime');
+                            }, remainingCount * 30);
+                            remainingCount++;
+                        }
+                    }
+                    await sleep(remainingCount * 30 + 500);
+                    btnNext.disabled = true;
+                    btnAuto.disabled = true;
+                    break;
+            }
+
+            if (stepIndex < 6 && !isAutoPlaying) {
+                btnNext.disabled = false; // 恢复按钮
+            }
+        }
+
+        // 手动下一步
+        async function nextStep() {
+            if (currentStep < 6) {
+                currentStep++;
+                await executeStep(currentStep);
+            }
+        }
+
+        // 一键自动演示
+        async function autoPlay() {
+            isAutoPlaying = true;
+            btnNext.disabled = true;
+            btnAuto.disabled = true;
+            
+            // 如果已经在中间步骤，则从当前步骤继续往下播
+            while (currentStep < 6 && isAutoPlaying) {
+                currentStep++;
+                await executeStep(currentStep);
+                await sleep(800); // 步骤之间的停顿，方便老师讲解
+            }
+            isAutoPlaying = false;
+        }
+
+        // 启动！
+        window.onload = initGrid;
+    </script>
+</body>
+</html>

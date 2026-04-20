@@ -1,0 +1,431 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>异分母分数加减法演示仪 - 安安老师教研站</title>
+    <style>
+        :root {
+            --primary: #4FC3F7;       /* 分数A 蓝 */
+            --secondary: #FFCA28;     /* 分数B 黄 */
+            --bg-color: #F8F9FA;
+            --panel-bg: #FFFFFF;
+            --text-main: #333333;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+            font-family: 'PingFang SC', 'Microsoft YaHei', sans-serif;
+            background-color: var(--bg-color);
+            display: flex;
+            height: 100vh;
+            overflow: hidden;
+            color: var(--text-main);
+        }
+
+        /* 左侧控制区 */
+        #control-panel {
+            width: 32%;
+            min-width: 350px;
+            background-color: var(--panel-bg);
+            margin: 20px;
+            border-radius: 16px;
+            box-shadow: 0 8px 24px rgba(0,0,0,0.06);
+            display: flex;
+            flex-direction: column;
+            padding: 25px;
+            z-index: 10;
+            user-select: none; /* 防止连点时选中文本 */
+        }
+
+        .header { text-align: center; margin-bottom: 20px; padding-bottom: 15px; border-bottom: 2px dashed #eee; }
+        .header h1 { font-size: 22px; color: #0288D1; letter-spacing: 1px; font-weight: bold; }
+
+        .control-group { margin-bottom: 20px; display: flex; flex-direction: column; gap: 10px; }
+        .control-label { font-size: 15px; font-weight: bold; color: var(--text-main); }
+
+        /* 分数设置器 - 确保绝对可点击 */
+        .fraction-setter {
+            display: flex; align-items: center; justify-content: space-evenly;
+            background: #F9FAFB; padding: 15px 10px; border-radius: 12px; border: 1px solid #E5E7EB;
+        }
+        
+        .frac-box { display: flex; flex-direction: column; align-items: center; gap: 6px; }
+        .frac-box .line { width: 45px; height: 3px; background: #333; border-radius: 2px; }
+        
+        /* 放大按钮，增加触控手感 */
+        .btn-mini {
+            width: 32px; height: 32px; border-radius: 50%; border: 1px solid #CCC; background: #FFF;
+            color: #333; font-weight: bold; cursor: pointer; transition: 0.1s;
+            display: flex; align-items: center; justify-content: center; font-size: 20px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+        }
+        .btn-mini:hover { background: #E1F5FE; border-color: #0288D1; color: #0288D1; }
+        .btn-mini:active { transform: scale(0.9); background: #B3E5FC; }
+        
+        .val-num { font-size: 22px; font-weight: bold; width: 32px; text-align: center; }
+        .val-num.blue { color: #0288D1; }
+        .val-num.yellow { color: #F57F17; }
+
+        select {
+            padding: 8px; font-size: 18px; border: 2px solid #90A4AE;
+            border-radius: 8px; font-weight: bold; outline: none; cursor: pointer;
+        }
+
+        /* 进度滑块 */
+        .slider-wrapper {
+            background: #FAFAFA; padding: 15px; border-radius: 10px; border: 1px solid #E0E0E0;
+        }
+        .step-labels { display: flex; justify-content: space-between; font-size: 14px; font-weight: bold; color: #777; margin-bottom: 10px; }
+        .step-labels span { cursor: pointer; padding: 4px 8px; border-radius: 4px; transition: 0.3s;}
+        .step-labels span.active { color: #FFF; background: #0288D1; }
+        input[type=range] { width: 100%; cursor: pointer; height: 6px; }
+
+        /* 算式展示卡片 */
+        .formula-card {
+            margin-top: auto; background: #E1F5FE; border-radius: 12px; padding: 20px;
+            text-align: center; border: 2px solid #0288D1;
+        }
+        .formula-card .title { font-size: 14px; color: #0288D1; font-weight: bold; margin-bottom: 10px; }
+        
+        .math-eq { display: inline-flex; align-items: center; font-size: 24px; font-weight: bold; font-family: 'Times New Roman', serif; }
+        .frac { display: inline-flex; flex-direction: column; align-items: center; margin: 0 8px; }
+        .frac .n { border-bottom: 2px solid #333; padding: 0 6px; }
+        .frac .d { padding: 0 6px; }
+        .op { margin: 0 8px; }
+
+        /* 右侧展示区 */
+        #display-area {
+            flex: 1; background-color: #FFFFFF; margin: 20px 20px 20px 0; border-radius: 16px; box-shadow: 0 8px 24px rgba(0,0,0,0.04); position: relative;
+        }
+
+        .watermark {
+            position: absolute; right: 25px; bottom: 20px; font-size: 32px; font-weight: bold; color: rgba(0, 0, 0, 0.04); letter-spacing: 2px; pointer-events: none; user-select: none;
+        }
+
+        svg { width: 100%; height: 100%; }
+
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+    </style>
+</head>
+<body>
+
+    <div id="control-panel">
+        <div class="header">
+            <h1>异分母加减法演示仪</h1>
+        </div>
+
+        <div class="control-group">
+            <div class="control-label">1. 设置分数与运算：</div>
+            <div class="fraction-setter">
+                <div class="frac-box">
+                    <span style="font-size:12px; color:#0288D1; font-weight:bold;">分数A (蓝)</span>
+                    <button class="btn-mini" onclick="changeVal('na', 1)">+</button>
+                    <div class="val-num blue" id="lbl-na">1</div>
+                    <button class="btn-mini" onclick="changeVal('na', -1)">-</button>
+                    <div class="line"></div>
+                    <button class="btn-mini" onclick="changeVal('da', 1)">+</button>
+                    <div class="val-num blue" id="lbl-da">2</div>
+                    <button class="btn-mini" onclick="changeVal('da', -1)">-</button>
+                </div>
+
+                <select id="opSelect" onchange="changeOp()">
+                    <option value="+">➕ 加法</option>
+                    <option value="-">➖ 减法</option>
+                </select>
+
+                <div class="frac-box">
+                    <span style="font-size:12px; color:#F57F17; font-weight:bold;">分数B (黄)</span>
+                    <button class="btn-mini" onclick="changeVal('nb', 1)">+</button>
+                    <div class="val-num yellow" id="lbl-nb">1</div>
+                    <button class="btn-mini" onclick="changeVal('nb', -1)">-</button>
+                    <div class="line"></div>
+                    <button class="btn-mini" onclick="changeVal('db', 1)">+</button>
+                    <div class="val-num yellow" id="lbl-db">3</div>
+                    <button class="btn-mini" onclick="changeVal('db', -1)">-</button>
+                </div>
+            </div>
+            <div id="warningMsg" style="font-size:12px; color:#E53935; text-align:center; height:16px; margin-top:5px; font-weight:bold;"></div>
+        </div>
+
+        <div class="control-group">
+            <div class="control-label">2. 动画演示步骤：</div>
+            <div class="slider-wrapper">
+                <div class="step-labels">
+                    <span id="step-lbl-0" onclick="setStep(0)">1.初始图形</span>
+                    <span id="step-lbl-1" onclick="setStep(1)">2.动态通分</span>
+                    <span id="step-lbl-2" onclick="setStep(2)">3.合并结果</span>
+                </div>
+                <input type="range" id="stepSlider" min="0" max="2" value="0" step="1" oninput="setStep(this.value)">
+            </div>
+        </div>
+
+        <div class="formula-card">
+            <div class="title">算理推导过程</div>
+            <div id="formula-container" class="math-eq"></div>
+        </div>
+    </div>
+
+    <div id="display-area">
+        <svg id="math-svg" viewBox="0 0 800 600" preserveAspectRatio="xMidYMid meet"></svg>
+        <div class="watermark">安安老师</div>
+    </div>
+
+    <script>
+        // --- 核心数据与状态 ---
+        let state = {
+            na: 1, da: 2,
+            nb: 1, db: 3,
+            op: '+',
+            step: 0
+        };
+
+        // --- 修复了这里的坐标变量重名致命Bug ---
+        const W = 180, H = 180; 
+        const ax = 120, ay = 60; 
+        const bx = 460, by = 60; 
+        const rx1 = 200, ry = 340; 
+        const rx2 = 420; // 第二个结果框的横坐标
+
+        function showWarning(msg) {
+            const w = document.getElementById('warningMsg');
+            w.innerText = msg;
+            setTimeout(() => { w.innerText = ""; }, 2500);
+        }
+
+        // --- 处理加减点击逻辑 ---
+        function changeVal(param, delta) {
+            let val = state[param] + delta;
+            
+            // 基础范围限制 (分母2-8, 分子1-8)
+            if (param === 'da' || param === 'db') {
+                if (val < 2) val = 2;
+                if (val > 8) val = 8;
+            } else {
+                if (val < 1) val = 1;
+                if (val > 8) val = 8;
+            }
+            state[param] = val;
+
+            // 规则1：分子不能大于分母
+            if (state.na > state.da) state.na = state.da;
+            if (state.nb > state.db) state.nb = state.db;
+
+            // 规则2：减法时，前面的数必须大于等于后面的数
+            if (state.op === '-') {
+                let valA = state.na / state.da;
+                let valB = state.nb / state.db;
+                if (valA < valB) {
+                    showWarning("减法时前面分数不能小于后面！已自动修正");
+                    state.na = state.da; // 自动调大A的分子
+                }
+            }
+
+            state.step = 0; // 改数字后回到初始图形
+            updateUI();
+        }
+
+        // --- 切换加减法 ---
+        function changeOp() {
+            state.op = document.getElementById('opSelect').value;
+            if (state.op === '-') {
+                let valA = state.na / state.da;
+                let valB = state.nb / state.db;
+                if (valA < valB) {
+                    state.na = state.da; 
+                    showWarning("切换减法，已自动调大前面的分数");
+                }
+            }
+            state.step = 0;
+            updateUI();
+        }
+
+        function setStep(val) {
+            state.step = parseInt(val);
+            updateUI();
+        }
+
+        // --- UI 更新与绘制核心 ---
+        function updateUI() {
+            // 1. 同步左侧数字面板
+            document.getElementById('lbl-na').innerText = state.na;
+            document.getElementById('lbl-da').innerText = state.da;
+            document.getElementById('lbl-nb').innerText = state.nb;
+            document.getElementById('lbl-db').innerText = state.db;
+            
+            // 同步滑块
+            document.getElementById('stepSlider').value = state.step;
+            for(let i=0; i<=2; i++) {
+                document.getElementById(`step-lbl-${i}`).className = (i === state.step) ? 'active' : '';
+            }
+
+            // 2. 算式生成
+            const form = document.getElementById('formula-container');
+            const totalDenom = state.da * state.db;
+            const totalA = state.na * state.db;
+            const totalB = state.nb * state.da;
+            
+            const getFrac = (n, d) => `<div class="frac"><div class="n">${n}</div><div class="d">${d}</div></div>`;
+            
+            if (state.step === 0) {
+                form.innerHTML = `${getFrac(state.na, state.da)} <div class="op">${state.op}</div> ${getFrac(state.nb, state.db)} <div class="op">=</div> ?`;
+            } else if (state.step === 1) {
+                form.innerHTML = `${getFrac(totalA, totalDenom)} <div class="op">${state.op}</div> ${getFrac(totalB, totalDenom)} <div class="op">=</div> ?`;
+            } else {
+                let res = state.op === '+' ? (totalA + totalB) : (totalA - totalB);
+                form.innerHTML = `${getFrac(totalA, totalDenom)} <div class="op">${state.op}</div> ${getFrac(totalB, totalDenom)} <div class="op">=</div> <span style="color:#D84315;">${getFrac(res, totalDenom)}</span>`;
+            }
+
+            // 3. 绘制重构的SVG
+            drawSVG();
+        }
+
+        function createSVGEl(type, attrs) {
+            const el = document.createElementNS('http://www.w3.org/2000/svg', type);
+            for (let k in attrs) el.setAttribute(k, attrs[k]);
+            return el;
+        }
+
+        function drawSVG() {
+            const svg = document.getElementById('math-svg');
+            svg.innerHTML = '';
+
+            const cellWa = W / state.da; 
+            const cellHb = H / state.db; 
+            const cellHa = H / state.db; 
+            const cellWb = W / state.da; 
+
+            const totalPiecesA = state.na * state.db;
+            const totalPiecesB = state.nb * state.da;
+            const commonDenom = state.da * state.db;
+
+            // 背景底框绘制
+            const createBox = (x, y) => svg.appendChild(createSVGEl('rect', {x, y, width:W, height:H, fill:'#F5F5F5', stroke:'#B0BEC5', 'stroke-width':2, 'stroke-dasharray':'4,4'}));
+            createBox(ax, ay);
+            createBox(bx, by);
+            createBox(rx1, ry);
+            if (state.op === '+' && (totalPiecesA + totalPiecesB) > commonDenom) createBox(rx2, ry);
+
+            // 操作符文本
+            const opText = createSVGEl('text', {x:390, y:160, 'font-size':40, 'font-weight':'bold', 'text-anchor':'middle', fill:'#333'});
+            opText.textContent = state.op;
+            svg.appendChild(opText);
+
+            const arrowText = createSVGEl('text', {x:390, y:290, 'font-size':30, 'font-weight':'bold', 'text-anchor':'middle', fill:'#90A4AE'});
+            arrowText.textContent = '⬇ 合并';
+            svg.appendChild(arrowText);
+
+            // 渲染色块群组
+            const blocksGroup = createSVGEl('g', {});
+            svg.appendChild(blocksGroup);
+
+            // A 色块 (蓝色)
+            for(let i=0; i < totalPiecesA; i++) {
+                let col = Math.floor(i / state.db);
+                let row = i % state.db;
+                let tx = ax + col * cellWa;
+                let ty = ay + row * cellHa;
+                
+                if (state.step === 2) {
+                    let rCol = Math.floor(i / state.db);
+                    let rRow = i % state.db;
+                    tx = rx1 + rCol * cellWa;
+                    ty = ry + rRow * cellHa;
+                }
+
+                let rect = createSVGEl('rect', {width:cellWa, height:cellHa, fill:'var(--primary)', stroke:'#FFF', 'stroke-width':1});
+                rect.style.transition = 'all 0.6s cubic-bezier(0.25, 0.8, 0.25, 1)';
+                rect.style.transform = `translate(${tx}px, ${ty}px)`;
+                rect.id = `block-a-${i}`;
+                blocksGroup.appendChild(rect);
+            }
+
+            // B 色块 (黄色)
+            for(let i=0; i < totalPiecesB; i++) {
+                let row = Math.floor(i / state.da);
+                let col = i % state.da;
+                let tx = bx + col * cellWb;
+                let ty = by + row * cellHb;
+                let scale = 1;
+                let fill = 'var(--secondary)';
+
+                if (state.step === 2) {
+                    if (state.op === '+') {
+                        let targetIdx = totalPiecesA + i;
+                        let boxOffset = targetIdx >= commonDenom ? (rx2 - rx1) : 0;
+                        let localIdx = targetIdx % commonDenom;
+                        let rCol = Math.floor(localIdx / state.db);
+                        let rRow = localIdx % state.db;
+                        tx = rx1 + boxOffset + rCol * cellWb;
+                        ty = ry + rRow * cellHb;
+                    } else {
+                        // 减法抵消动画
+                        let targetIdx = totalPiecesA - totalPiecesB + i;
+                        let rCol = Math.floor(targetIdx / state.db);
+                        let rRow = targetIdx % state.db;
+                        tx = rx1 + rCol * cellWb;
+                        ty = ry + rRow * cellHb;
+                        fill = '#EF5350'; 
+                        
+                        setTimeout(() => {
+                            if(state.step !== 2) return;
+                            const currentB = document.getElementById(`block-b-${i}`);
+                            const targetA = document.getElementById(`block-a-${targetIdx}`);
+                            if(currentB) currentB.style.transform = `translate(${tx}px, ${ty}px) scale(0)`;
+                            if(targetA) targetA.style.transform = `translate(${tx}px, ${ty}px) scale(0)`;
+                        }, 800);
+                    }
+                }
+
+                let rect = createSVGEl('rect', {width:cellWb, height:cellHb, fill:fill, stroke:'#FFF', 'stroke-width':1});
+                rect.style.transition = 'all 0.6s cubic-bezier(0.25, 0.8, 0.25, 1), fill 0.3s';
+                rect.style.transform = `translate(${tx}px, ${ty}px) scale(${scale})`;
+                rect.style.transformOrigin = 'center';
+                rect.id = `block-b-${i}`;
+                blocksGroup.appendChild(rect);
+            }
+
+            // 渲染动态网格线
+            const gridGroup = createSVGEl('g', {stroke:'#333', 'stroke-width':2});
+            svg.appendChild(gridGroup);
+
+            // A 竖线
+            for(let i=1; i<state.da; i++) gridGroup.appendChild(createSVGEl('line', {x1:ax+i*cellWa, y1:ay, x2:ax+i*cellWa, y2:ay+H}));
+            // A 动态横线
+            if(state.step >= 1) {
+                for(let i=1; i<state.db; i++) {
+                    let l = createSVGEl('line', {x1:ax, y1:ay+i*cellHa, x2:ax+W, y2:ay+i*cellHa, 'stroke-dasharray':'5 5'});
+                    l.style.animation = 'fadeIn 0.5s';
+                    gridGroup.appendChild(l);
+                }
+            }
+
+            // B 横线
+            for(let i=1; i<state.db; i++) gridGroup.appendChild(createSVGEl('line', {x1:bx, y1:by+i*cellHb, x2:bx+W, y2:by+i*cellHb}));
+            // B 动态竖线
+            if(state.step >= 1) {
+                for(let i=1; i<state.da; i++) {
+                    let l = createSVGEl('line', {x1:bx+i*cellWb, y1:by, x2:bx+i*cellWb, y2:by+H, 'stroke-dasharray':'5 5'});
+                    l.style.animation = 'fadeIn 0.5s';
+                    gridGroup.appendChild(l);
+                }
+            }
+
+            // 结果框网格线
+            if(state.step === 2) {
+                for(let i=1; i<state.da; i++) gridGroup.appendChild(createSVGEl('line', {x1:rx1+i*cellWa, y1:ry, x2:rx1+i*cellWa, y2:ry+H}));
+                for(let i=1; i<state.db; i++) gridGroup.appendChild(createSVGEl('line', {x1:rx1, y1:ry+i*cellHa, x2:rx1+W, y2:ry+i*cellHa}));
+                
+                if (state.op === '+' && (totalPiecesA + totalPiecesB) > commonDenom) {
+                    for(let i=1; i<state.da; i++) gridGroup.appendChild(createSVGEl('line', {x1:rx2+i*cellWa, y1:ry, x2:rx2+i*cellWa, y2:ry+H}));
+                    for(let i=1; i<state.db; i++) gridGroup.appendChild(createSVGEl('line', {x1:rx2, y1:ry+i*cellHa, x2:rx2+W, y2:ry+i*cellHa}));
+                }
+            }
+        }
+
+        // 页面初始化加载
+        window.onload = updateUI;
+    </script>
+</body>
+</html>
